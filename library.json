@@ -1,6 +1,6 @@
 {
   "name": "SimcomA76xx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A library for SimCom A76xx series LTE modems, focusing on stable AT command parsing and network band management.",
   "keywords": "communication, lte, simcom, a7670, a76xx, cellular, bands, esp32",
   "repository": {
