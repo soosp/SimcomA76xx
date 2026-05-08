@@ -62,7 +62,10 @@ bool SimcomA76xx::waitForReady(uint32_t timeoutMs) {
 }
 
 /**
- * @brief Low-level line reader. Handles \r\n endings.
+ * @brief Reads one line from the serial port into _lineBuf.
+ * Strips trailing \r\n. Returns false on timeout.
+ * @note Also detects the SMS input prompt ("> ") which is not
+ *       terminated with a newline.
  */
 bool SimcomA76xx::readLine(uint32_t timeout) {
     if (!_serial) return false;
@@ -77,6 +80,8 @@ bool SimcomA76xx::readLine(uint32_t timeout) {
                 return true;
             }
             if (idx < sizeof(_lineBuf) - 1) _lineBuf[idx++] = c;
+            // SMS prompt: "> " arrives without \n
+            if (idx == 2 && _lineBuf[0] == '>' && _lineBuf[1] == ' ') return true;
         }
         _wait(1);
     }
