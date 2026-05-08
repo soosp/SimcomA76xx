@@ -199,6 +199,8 @@ public:
      * @param gsmMask GSM band mask built from Bands::GSM constants.
      * @param lteMask LTE band mask built from Bands::LTE constants.
      * @return true if the modem accepted the new band configuration, false on error.
+     * @note Band changes may require a radio cycle to take effect. If the new
+     *       configuration is not applied, try to call forceReattach() after this method.
      */
     bool setAllowedBands(uint64_t gsmMask, uint64_t lteMask);
 

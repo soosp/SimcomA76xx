@@ -47,6 +47,8 @@ void setup() {
     Serial.println(F("Limit the communication to 900 MHz LTE band (B8)"));
     modem.setAllowedModes(MODE_LTE_ONLY);
     modem.setAllowedBands(Bands::GSM_900, Bands::B8);
+    // Band changes may require a radio cycle to take effect.
+    modem.forceReattach();
     delay(500);
 
     // Reading back the settings

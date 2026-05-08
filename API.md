@@ -54,6 +54,9 @@ Sets the preferred radio technology.
 Restricts the modem to specific frequency bands. Use `Bands::LTE` and
 `Bands::GSM` constants.
 
+> **Note**: Band changes may require a radio cycle to take effect. If the new
+> configuration is not applied, try to call `forceReattach()` after `setAllowedBands()`.
+
 #### `bool setAPN(const char* apn, const char* user = "", const char* pwd = "")`
 
 Configures the Access Point Name for data connectivity. Required for HTTP/MQTT.
