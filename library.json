@@ -22,5 +22,6 @@
   ],
   "export": {
     "include": "src/*"
-  }
+  },
+  "examples": "examples/*/*.ino"
 }
