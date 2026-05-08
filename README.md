@@ -70,7 +70,7 @@ void loop() {
 }
 ```
 
-## Using with [SafeSerial](https://github.com/youruser/SafeSerial) on ESP32
+## Using with [SafeSerial](https://github.com/soosp/SafeSerial) on ESP32
 
 ```cpp
 #include <Arduino.h>
