@@ -1,9 +1,9 @@
 # SimcomA76xx
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 Arduino library for the **SimCom A76xx** series (including A7670E, A7682E, A7600)
 LTE modems.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 This library focuses on stability, predictable AT command parsing, and advanced
 network management, specifically designed for Arduino environments.
