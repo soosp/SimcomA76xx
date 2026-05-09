@@ -12,7 +12,7 @@ SimcomA76xx modem;
 void setup() {
     // For logging
     Serial.begin(115200);
-    // Underlyng modem interface (RX pin 40, TX pin 39)
+    // Underlying modem interface (RX pin 40, TX pin 39)
     Serial2.begin(115200, SERIAL_8N1, 40, 39);
 
     // Modem power pin connected to pin 6

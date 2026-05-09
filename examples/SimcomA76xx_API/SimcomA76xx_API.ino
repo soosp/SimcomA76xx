@@ -86,7 +86,7 @@ void setup() {
         Serial.print(F("Signal strength (CSQ): ")); Serial.println(rssi);
     }
     
-    Serial.println(F("Re-check the the results of settings..."));
+    Serial.println(F("Re-check the results of settings..."));
     NetworkMode netMode = modem.getMode();
     if (netMode == MODE_AUTOMATIC || netMode == MODE_LTE_ONLY) {
         Serial.println(F(" LTE mode is enabled."));
