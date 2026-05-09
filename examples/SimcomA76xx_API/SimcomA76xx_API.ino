@@ -47,14 +47,12 @@ void setup() {
     // the 900 MHz band LTE (B8). GSM 900 is set for safety reasons.
     Serial.println(F("Limit the communication to 900 MHz LTE band (B8)..."));
     modem.setAllowedModes(MODE_LTE_ONLY);
-
-    // Band changes may require a radio cycle to take effect.
     if (modem.setAllowedBands(Bands::GSM_900, Bands::B8)) {
         Serial.println(F("Band configuration accepted."));
-        // Band changes may require a radio cycle to take effect.
         // On some firmware versions the modem reattaches automatically.
-        // In this case uncomment the lines below.
-        // Serial.println(F("Waiting for reattach..."));
+        // In other cases band changes may require a radio cycle to take effect.
+        // To force the radio cycle uncomment the lines below.
+        // Serial.println(F("Forcing reattach..."));
         // modem.forceReattach();
     } else {
         Serial.println(F("Warning: Band configuration rejected by modem."));
