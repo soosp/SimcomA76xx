@@ -32,7 +32,7 @@ For PlatformIO, extract the ZIP file into the `lib` directory in your project fo
 **Recommendations:**
 
 - For thread-safe operation on ESP32 series MCUs, recommended to use
-[SafeSerial](https://github.com/youruser/SafeSerial) library instead of using
+[SafeSerial](https://github.com/soosp/SafeSerial) library instead of using
 the low level Serial ports directly.
 
 ## Quick Example
