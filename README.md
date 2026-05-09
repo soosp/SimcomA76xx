@@ -23,7 +23,21 @@ registration validation.
 
 ## Installation
 
-Currently, the library can be installed manually:
+### PlatformIO
+
+Add to your `platformio.ini`:
+
+```ini
+lib_deps =
+    soosp/SimcomA76xx @ ^0.2.0
+```
+
+### Arduino IDE
+
+Search for **SimcomA76xx** in the Library Manager (Sketch → Include Library →
+Manage Libraries).
+
+### Install manually
 
 1. Download the repository as a ZIP.
 2. In the Arduino IDE, go to **Sketch -> Include Library -> Add .ZIP Library**.
