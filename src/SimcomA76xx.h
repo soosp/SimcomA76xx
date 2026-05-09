@@ -114,6 +114,35 @@ private:
     char _lineBuf[256];
     int8_t _pwrPin;
 
+    // Measured boot time: ~13s. 20000ms provides safe margin.
+    static const uint32_t WAIT_READY_TIMEOUT_MS  = 20000;
+
+    // AT+CFUN=0 (5000) + settling (1500) + AT+CFUN=1 (5000) + waitForReady (20000)
+    static const uint32_t FORCE_REATTACH_DURATION_MS = 31500;
+
+    // AT+CMGS prompt (5000) + message send (30000) + margin
+    static const uint32_t SEND_SMS_DURATION_MS = 37000;
+
+#ifdef ARDUINO_ARCH_ESP32
+    SemaphoreHandle_t _mutex;
+#endif
+    // It has to be defined even if on non-ESP32 platforms
+    uint32_t _mutexTimeout;
+
+    /**
+     * @brief Acquires the recursive mutex to protect AT transactions.
+     * On non-ESP32 platforms this is a no-op and always returns true.
+     * @param timeoutMs Maximum time to wait for the lock in milliseconds.
+     * @return true if the lock was acquired, false on timeout.
+     */
+    bool _lock(uint32_t timeoutMs);
+
+    /**
+     * @brief Releases the recursive mutex.
+     * On non-ESP32 platforms this is a no-op.
+     */
+    void _unlock();
+
     /**
      * @brief Reads one line from the serial port into _lineBuf.
      * Strips trailing \\r\\n. Returns false on timeout.
@@ -172,7 +201,7 @@ public:
      * @param timeoutMs Maximum time to wait in milliseconds.
      * @return true if the modem became ready within the timeout, false otherwise.
      */
-    bool waitForReady(uint32_t timeoutMs = 20000);
+    bool waitForReady(uint32_t timeoutMs = WAIT_READY_TIMEOUT_MS);
 
     /**
      * @brief Sends a raw AT command and waits for a specific response.
@@ -186,6 +215,19 @@ public:
      */
     bool sendAT(const char* command, const char* expectedResponse = "OK",
                 uint32_t timeout = 1000, bool multiline = false);
+
+#ifdef ARDUINO_ARCH_ESP32
+    /**
+     * @brief Sets the maximum time to wait for the mutex lock.
+     * This value is used as the base timeout for all AT transactions.
+     * Time-intensive operations (sendSMS, forceReattach) automatically
+     * add their expected transaction time on top of this value.
+     * Only available on ESP32 platforms (ARDUINO_ARCH_ESP32).
+     * On AVR, STM32 and ESP8266 platforms this is a no-op.
+     * @param ms Timeout in milliseconds. Default is 10000.
+     */
+    void setMutexTimeout(uint32_t ms);
+#endif
 
     /**
      * @brief Sets the preferred network mode.

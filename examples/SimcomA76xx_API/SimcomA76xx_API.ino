@@ -8,6 +8,7 @@
 #include <SafeSerial.h>
 #include "SimcomA76xx.h"
 
+// Change it to the desired destination phone number in international format.
 const char* phoneNumber = "+3630XXXXXXX";
 // Set it true if you want test SMS sending
 const bool sendSms = false;
@@ -44,20 +45,39 @@ void setup() {
 
     // Example: limit the band access for an antenna developed for
     // the 900 MHz band LTE (B8). GSM 900 is set for safety reasons.
-    Serial.println(F("Limit the communication to 900 MHz LTE band (B8)"));
+    Serial.println(F("Limit the communication to 900 MHz LTE band (B8)..."));
     modem.setAllowedModes(MODE_LTE_ONLY);
-    modem.setAllowedBands(Bands::GSM_900, Bands::B8);
+
     // Band changes may require a radio cycle to take effect.
-    modem.forceReattach();
+    if (modem.setAllowedBands(Bands::GSM_900, Bands::B8)) {
+        Serial.println(F("Band configuration accepted."));
+        // Band changes may require a radio cycle to take effect.
+        // On some firmware versions the modem reattaches automatically.
+        // In this case uncomment the lines below.
+        // Serial.println(F("Waiting for reattach..."));
+        // modem.forceReattach();
+    } else {
+        Serial.println(F("Warning: Band configuration rejected by modem."));
+    }
     delay(500);
 
-    // Reading back the settings
+    // Reading back the settings to verify
     SupportedBands activeBands;
     if (modem.getSupportedBands(&activeBands)) {
-        Serial.print(F("LTE B8:   ")); Serial.println(activeBands.lteB8 ? "OK" : "NO");
-        Serial.print(F("GSM 900:  ")); Serial.println(activeBands.gsm900 ? "OK" : "NO");
-        Serial.print(F("LTE only mode: ")); Serial.println((modem.getMode() == MODE_LTE_ONLY) ? "YES" : "NO");
+        bool b8ok  = activeBands.lteB8;
+        bool g900ok = activeBands.gsm900;
+        bool modeok = (modem.getMode() == MODE_LTE_ONLY);
+
+        Serial.print(F("LTE B8:        ")); Serial.println(b8ok   ? "OK" : "NO");
+        Serial.print(F("GSM 900:       ")); Serial.println(g900ok  ? "OK" : "NO");
+        Serial.print(F("LTE only mode: ")); Serial.println(modeok  ? "YES" : "NO");
         Serial.print(F("LTE mask: 0x")); Serial.println(activeBands.lteMask, HEX);
+
+        if (b8ok && g900ok && modeok) {
+            Serial.println(F("Band configuration: OK"));
+        } else {
+            Serial.println(F("Warning: Band configuration mismatch."));
+        }
     }
 
     // Signal strength

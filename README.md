@@ -29,12 +29,6 @@ Currently, the library can be installed manually:
 2. In the Arduino IDE, go to **Sketch -> Include Library -> Add .ZIP Library**.
 For PlatformIO, extract the ZIP file into the `lib` directory in your project folder.
 
-**Recommendations:**
-
-- For thread-safe operation on ESP32 series MCUs, recommended to use
-[SafeSerial](https://github.com/soosp/SafeSerial) library instead of using
-the low level Serial ports directly.
-
 ## Quick Example
 
 ```cpp
@@ -106,6 +100,26 @@ void loop() {
     vTaskDelay(pdMS_TO_TICKS(1000));
 }
 ```
+
+## Thread Safety (ESP32)
+
+On ESP32, all AT transactions are protected by a recursive FreeRTOS mutex,
+making it safe to call library methods from multiple tasks simultaneously.
+
+The default lock timeout is 10000 ms. If your application uses long-running
+concurrent operations, increase it with:
+
+```cpp
+modem.setMutexTimeout(15000);
+```
+
+On other platforms (AVR, STM32, ESP8266) the mutex is a no-op and has no overhead.
+
+**Recommendations:**
+
+- For fully thread-safe operation on ESP32 series MCUs, recommended to use
+[SafeSerial](https://github.com/soosp/SafeSerial) library instead of using
+the low level Serial ports directly.
 
 ## Contributing
 

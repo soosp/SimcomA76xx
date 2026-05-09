@@ -54,8 +54,10 @@ Sets the preferred radio technology.
 Restricts the modem to specific frequency bands. Use `Bands::LTE` and
 `Bands::GSM` constants.
 
-> **Note**: Band changes may require a radio cycle to take effect. If the new
-> configuration is not applied, try to call `forceReattach()` after `setAllowedBands()`.
+> **Note**: Band changes may require a radio cycle to take effect. On some
+> firmware versions the modem handles reattachment automatically after
+> `setAllowedBands()`. If the new configuration is not applied, call
+> `forceReattach()` explicitly.
 
 #### `bool setAPN(const char* apn, const char* user = "", const char* pwd = "")`
 
@@ -139,6 +141,22 @@ Sends a plain text SMS.
 Quickly toggles the radio (CFUN 0/1) to force the modem to look for a new cell.
 
 - **Returns**: `true` on success.
+
+### Configuration
+
+#### `void setMutexTimeout(uint32_t ms)` *(ESP32 only)*
+
+Sets the base time to wait for the mutex lock before an AT transaction.
+Time-intensive operations (`sendSMS`, `forceReattach`) automatically extend
+this value by their expected transaction duration. Default is 10000 ms.
+
+If the lock cannot be acquired within the timeout, the method returns its
+error value (e.g. `false`, `99`, or `REG_ERROR`) without communicating with
+the modem.
+
+> **Note**: Increase this value if multiple tasks frequently call long-running
+> methods concurrently. Setting it too low may cause methods to return its error
+> value even when the modem is functioning correctly.
 
 ---
 
