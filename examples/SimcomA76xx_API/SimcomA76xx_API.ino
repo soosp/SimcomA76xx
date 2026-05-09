@@ -5,7 +5,6 @@
  */
 
 #include <Arduino.h>
-#include <SafeSerial.h>
 #include "SimcomA76xx.h"
 
 // Change it to the desired destination phone number in international format.
