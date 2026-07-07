@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
 - Removed unnecessary header from API example
 
 ## [0.2.0] - 2026-05-10
