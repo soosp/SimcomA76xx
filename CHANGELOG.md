@@ -8,6 +8,11 @@ All notable changes to this project will be documented in this file.
 
 - Removed unnecessary header from API example
 
+### Fixed
+
+- AVR builds: `getSupportedBands()` no longer uses `strtoull()`, which
+  avr-libc does not provide
+
 ## [0.2.0] - 2026-05-10
 
 ### Added

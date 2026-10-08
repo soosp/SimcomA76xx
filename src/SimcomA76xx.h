@@ -165,6 +165,15 @@ private:
     void _wait(uint32_t ms);
 
     /**
+     * @brief Parses a hexadecimal number (optional "0x" prefix) into 64 bits.
+     * Portable replacement for strtoull(), which avr-libc does not provide.
+     * Stops at the first non-hex character.
+     * @param s Input string.
+     * @return The parsed value (0 if no digits).
+     */
+    static uint64_t hexToUint64(const char* s);
+
+    /**
      * @brief Converts a uint64_t band mask to a hex string for AT+CNBP command.
      * @param val Value to convert.
      * @param out Output buffer (at least 20 bytes).

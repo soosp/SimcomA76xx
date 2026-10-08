@@ -41,6 +41,21 @@ void SimcomA76xx::uint64ToHex(uint64_t val, char* out) {
     sprintf(out, "0x%08lX%08lX", (unsigned long)high, (unsigned long)low);
 }
 
+uint64_t SimcomA76xx::hexToUint64(const char* s) {
+    while (*s == ' ') s++;
+    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) s += 2;
+    uint64_t v = 0;
+    for (;; s++) {
+        uint8_t d;
+        if      (*s >= '0' && *s <= '9') d = (uint8_t)(*s - '0');
+        else if (*s >= 'a' && *s <= 'f') d = (uint8_t)(*s - 'a' + 10);
+        else if (*s >= 'A' && *s <= 'F') d = (uint8_t)(*s - 'A' + 10);
+        else break;
+        v = (v << 4) | d;
+    }
+    return v;
+}
+
 bool SimcomA76xx::parseQuotedField(char* buf, uint8_t maxLen) {
     char* firstQuote = strchr(_lineBuf, '"');
     if (!firstQuote) return false;
@@ -204,9 +219,9 @@ bool SimcomA76xx::getSupportedBands(SupportedBands* bands) {
             gsmPart += 2;
             char* ltePart = strchr(gsmPart, ',');
             if (ltePart) {
-                bands->gsmMask = strtoull(gsmPart, NULL, 16);
+                bands->gsmMask = hexToUint64(gsmPart);
                 ltePart++;
-                bands->lteMask = strtoull(ltePart, NULL, 16);
+                bands->lteMask = hexToUint64(ltePart);
                 bands->lteB1   = (bands->lteMask & Bands::B1);
                 bands->lteB3   = (bands->lteMask & Bands::B3);
                 bands->lteB7   = (bands->lteMask & Bands::B7);
