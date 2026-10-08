@@ -1,0 +1,28 @@
+{
+  // One-click test runner for VSCode. Press Ctrl+Shift+B (Run Build Task) to
+  // build and run the host tests in test/. The PATH entries below make the
+  // MSYS2 toolchain visible to the task without changing the system PATH;
+  // adjust them if your compiler lives elsewhere.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run SimcomA76xx tests",
+      "type": "shell",
+      "command": "./run_tests.sh",
+      "windows": { "command": "cmd.exe", "args": ["/c", "run_tests.bat", "nopause"] },
+      "options": {
+        "cwd": "${workspaceFolder}/test",
+        "env": {
+          "PATH": "C:\\msys64\\ucrt64\\bin;C:\\msys64\\usr\\bin;${env:PATH}"
+        }
+      },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$gcc",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    }
+  ]
+}

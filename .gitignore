@@ -3,8 +3,9 @@
 .pioenvs/
 .piolibdeps/
 
-# VS Code
-.vscode/
+# VS Code (the shared build task is versioned, personal settings are not)
+.vscode/*
+!.vscode/tasks.json
 
 # Python (PlatformIO uses it)
 __pycache__/
@@ -13,3 +14,6 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Host test binaries
+test/build/
