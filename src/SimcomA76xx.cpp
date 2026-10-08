@@ -100,6 +100,7 @@ bool SimcomA76xx::waitForResponse(const char* expected, uint32_t timeout) {
             if (strcmp(_lineBuf, expected) == 0)          { result = true;  break; }
             if (strcmp(_lineBuf, "ERROR") == 0)           { result = false; break; }
             if (strncmp(_lineBuf, "+CME ERROR", 10) == 0) { result = false; break; }
+            if (strncmp(_lineBuf, "+CMS ERROR", 10) == 0) { result = false; break; }
         }
     }
     _unlock();
@@ -121,6 +122,7 @@ bool SimcomA76xx::sendAT(const char* command, const char* expectedResponse,
         if (readLine(timeout - (millis() - start))) {
             if (strcmp(_lineBuf, "ERROR") == 0)           { result = false; break; }
             if (strncmp(_lineBuf, "+CME ERROR", 10) == 0) { result = false; break; }
+            if (strncmp(_lineBuf, "+CMS ERROR", 10) == 0) { result = false; break; }
             if (strcmp(_lineBuf, expectedResponse) == 0)  { result = true;  break; }
             if (multiline && strstr(_lineBuf, expectedResponse)) { result = true; break; }
         }
@@ -374,17 +376,31 @@ uint32_t SimcomA76xx::getCellId() {
     return result;
 }
 
-bool SimcomA76xx::sendSMS(const char* phoneNumber, const char* message) {
+/// SmsPdu sink: one hex digit straight to the modem.
+static void writePduChar(char c, void* ctx) {
+    static_cast<Stream*>(ctx)->write((uint8_t)c);
+}
+
+bool SimcomA76xx::sendSMS(const char* phoneNumber, const char* message,
+                          uint32_t validityMinutes, SmsEncoding encoding,
+                          SmsInfo* info) {
+    SmsInfo text = SmsPdu::analyze(message, encoding);
+    if (info) *info = text;
+    if (!_serial || !SmsPdu::validNumber(phoneNumber)) return false;
     if (!_lock(_mutexTimeout + SEND_SMS_DURATION_MS)) return false;
 
     bool result = false;
-    if (sendAT("AT+CMGF=1", "OK", 2000)) {
-        char cmd[64];
-        snprintf(cmd, sizeof(cmd), "AT+CMGS=\"%s\"", phoneNumber);
+    if (sendAT("AT+CMGF=0", "OK", 2000)) {
+        char cmd[20];
+        snprintf(cmd, sizeof(cmd), "AT+CMGS=%u",
+                 (unsigned)SmsPdu::tpduLength(phoneNumber, text, validityMinutes));
         if (sendAT(cmd, "> ", 5000)) {
-            _serial->print(message);
+            SmsPdu::write(writePduChar, _serial, phoneNumber, message, text,
+                          validityMinutes);
             _serial->write(26); // Ctrl+Z to send
             result = waitForResponse("OK", 30000);
+        } else {
+            _serial->write(27); // ESC: abandon a prompt that may still come
         }
     }
     _unlock();

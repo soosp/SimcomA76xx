@@ -130,11 +130,51 @@ Parses the current band configuration into a `SupportedBands` struct.
 
 ### Utility
 
-#### `bool sendSMS(const char* phoneNumber, const char* message)`
+#### `bool sendSMS(const char* phoneNumber, const char* message, uint32_t validityMinutes = 0, SmsEncoding encoding = SmsEncoding::AUTO, SmsInfo* info = nullptr)`
 
-Sends a plain text SMS.
+Sends an SMS in PDU mode (`AT+CMGF=0`). The PDU is built by `SmsPdu.h` and
+streamed to the modem as it is encoded.
 
-- **phoneNumber**: International format recommended (e.g., "+3630...").
+- **phoneNumber**: an optional `+` and 1..20 digits, nothing else. With `+`
+  it is sent as an international number (`"+36301234567"`); without it as
+  dialled, for national numbers and operator short codes (`"06301234567"`,
+  `"1777"`). Spaces, dashes or any other character return `false` without
+  modem access.
+- **message**: UTF-8 text.
+- **validityMinutes**: how long the network keeps trying to deliver; rounded
+  up to what the PDU field can express (5-minute steps to 12 h, 30-minute
+  steps to 24 h, days to 30 days, weeks to 63 weeks). `0`: network default
+  (no validity field in the PDU).
+- **encoding**: `SmsEncoding::AUTO` (GSM 7-bit if every character fits the GSM
+  default alphabet or its extension table, UCS-2 otherwise), or a forced
+  `GSM7` (unmappable characters become `?`) / `UCS2`.
+- **info**: if not null, receives the result of the analysis — also when
+  sending fails.
+- **Returns**: `true` if the modem accepted the message (`OK` after
+  `+CMGS:`); `false` on an invalid number, a missing `>` prompt (an ESC is
+  then sent), `ERROR`, `+CME ERROR`, `+CMS ERROR` or a timeout.
+
+One SMS holds 160 GSM 7-bit septets (`€ [ ] { } ~ ^ \ |` take two) or 70
+UTF-16 units (an emoji takes two). Longer text is cut at a character boundary
+and `info.truncated` is set.
+
+> The two-argument form `sendSMS(number, message)` of earlier versions still
+> compiles, but now sends in PDU mode and accepts digits only (with an
+> optional leading `+`).
+
+#### `static SmsInfo analyzeSMS(const char* message, SmsEncoding encoding = SmsEncoding::AUTO)`
+
+How `sendSMS()` would encode `message`, without contacting the modem.
+
+#### `SmsInfo`
+
+|Field|Meaning|
+|---|---|
+|`encoding`|`GSM7` or `UCS2` (never `AUTO`)|
+|`used`|Septets (GSM 7-bit) or UTF-16 units (UCS-2) that will be sent|
+|`capacity`|160 or 70|
+|`inputUsed`|Bytes of the UTF-8 input that fit|
+|`truncated`|The text did not fit and was cut|
 
 #### `bool forceReattach()`
 

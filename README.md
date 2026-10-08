@@ -20,6 +20,11 @@ bands to match your antenna's tuning.
 Codes) gracefully without crashing.
 - **Reliable Networking**: Built-in methods for APN configuration and network
 registration validation.
+- **SMS in any language**: UTF-8 text is sent in PDU mode as GSM 7-bit when it
+fits the GSM alphabet (160 characters) and as UCS-2 otherwise (70 characters),
+chosen automatically — accented letters, `€` and emoji included. Over-long text
+is cut at a character boundary and the cut is reported; `analyzeSMS()` checks
+a text without the modem.
 
 ## Installation
 
@@ -114,6 +119,27 @@ void loop() {
     vTaskDelay(pdMS_TO_TICKS(1000));
 }
 ```
+
+## Sending SMS
+
+```cpp
+SmsInfo info;
+if (modem.sendSMS("+36301234567", "Hűtőkamra riasztás: -8,5 °C", 24 * 60,
+                  SmsEncoding::AUTO, &info)) {
+    // sent as info.encoding (GSM7 or UCS2), info.used of info.capacity units
+}
+```
+
+- The number is an optional `+` and digits only: `+` for international
+  numbers, none for national numbers and operator short codes. Anything else
+  is refused without contacting the modem.
+- `validityMinutes` (here 24 h) tells the network how long to keep trying if
+  the phone is unreachable; 0 leaves it to the network.
+- `SimcomA76xx::analyzeSMS(text)` returns the same `SmsInfo` without a modem —
+  useful to warn on a settings page that a message template will be cut.
+
+The encoder (`SmsPdu.h`) has no Arduino dependency and is covered by host
+tests against reference PDUs; see [test/README.md](test/README.md).
 
 ## Thread Safety (ESP32)
 

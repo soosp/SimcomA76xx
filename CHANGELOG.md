@@ -4,8 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `SmsPdu.h`: SMS-SUBMIT PDU encoder with no Arduino dependency — UTF-8
+  input, GSM 7-bit (default alphabet and extension table) or UCS-2 chosen
+  automatically, cut at a character boundary to one SMS, relative validity
+  period, hex output streamed through a callback
+- `sendSMS()` parameters `validityMinutes`, `encoding` and `info`
+- `analyzeSMS()`: how a text would be sent, without the modem
+
 ### Changed
 
+- `sendSMS()` sends in PDU mode (`AT+CMGF=0`) instead of text mode, so
+  accented letters and other non-ASCII text arrive intact
+- `sendSMS()` accepts the number as an optional `+` and digits only — `+`
+  numbers are sent as international, others (national numbers, operator short
+  codes) as dialled — and refuses anything else without contacting the modem
+- `+CMS ERROR` responses end a command as a failure, like `+CME ERROR`
 - Removed unnecessary header from API example
 
 ### Fixed

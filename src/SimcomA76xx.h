@@ -9,6 +9,7 @@
 
 #include <Arduino.h>
 #include <Stream.h>
+#include "SmsPdu.h"
 
 /**
  * @brief Network selection modes for AT+CNMP command.
@@ -332,12 +333,46 @@ public:
     uint32_t getCellId();
 
     /**
-     * @brief Sends a plain text SMS message in Text Mode (AT+CMGF=1).
-     * @param phoneNumber Destination number in international format (e.g. "+3630...").
-     * @param message The message text to send.
-     * @return true if the message was accepted by the network, false on error.
+     * @brief Sends an SMS in PDU mode (AT+CMGF=0), encoding chosen automatically.
+     *
+     * The text is UTF-8. With SmsEncoding::AUTO it is sent as GSM 7-bit if
+     * every character is in the GSM default alphabet or its extension table
+     * (160 septets per SMS), and as UCS-2 otherwise (70 characters per SMS).
+     * Text that does not fit in one SMS is cut at a character boundary; the
+     * cut is reported in @p info. See SmsPdu.h for the details.
+     *
+     * The PDU is streamed to the modem as it is encoded; no buffer is needed.
+     *
+     * @param phoneNumber      An optional '+' and 1..20 digits, nothing else:
+     *                         "+36301234567" (international), "06301234567"
+     *                         or "1777" (national / short code, sent as
+     *                         dialled). Anything else is refused without
+     *                         contacting the modem.
+     * @param message          Message text, UTF-8.
+     * @param validityMinutes  How long the network keeps trying to deliver;
+     *                         rounded up to what the PDU can express (up to
+     *                         63 weeks). 0: the network's default.
+     * @param encoding         AUTO, or a forced encoding.
+     * @param info             If not null, receives the encoding used, the
+     *                         length and whether the text was cut — also when
+     *                         sending fails.
+     * @return true if the modem accepted the message for delivery.
      */
-    bool sendSMS(const char* phoneNumber, const char* message);
+    bool sendSMS(const char* phoneNumber, const char* message,
+                 uint32_t validityMinutes = 0,
+                 SmsEncoding encoding = SmsEncoding::AUTO,
+                 SmsInfo* info = nullptr);
+
+    /**
+     * @brief How a text would be sent, without contacting the modem.
+     *
+     * For checking a message template before use (e.g. warning on a web form
+     * that it will be cut).
+     */
+    static SmsInfo analyzeSMS(const char* message,
+                              SmsEncoding encoding = SmsEncoding::AUTO) {
+        return SmsPdu::analyze(message, encoding);
+    }
 
     /**
      * @brief Forces the modem to detach and re-attach to the network (CFUN 0/1).
