@@ -34,7 +34,7 @@ Add to your `platformio.ini`:
 
 ```ini
 lib_deps =
-    soosp/SimcomA76xx @ ^0.2.0
+    soosp/SimcomA76xx @ ^0.3.0
 ```
 
 ### Arduino IDE

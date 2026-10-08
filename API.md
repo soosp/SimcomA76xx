@@ -1,4 +1,4 @@
-# SimcomA76xx API Reference (v0.2.0)
+# SimcomA76xx API Reference (v0.3.0)
 
 ## Class: SimcomA76xx
 
