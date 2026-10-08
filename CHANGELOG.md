@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
   period, hex output streamed through a callback
 - `sendSMS()` parameters `validityMinutes`, `encoding` and `info`
 - `analyzeSMS()`: how a text would be sent, without the modem
+- Host test suite in `test/` (reference PDUs, a simulated modem), runnable
+  from VS Code with Ctrl+Shift+B
+- Example: `SimcomA76xx_SMS`
 
 ### Changed
 
