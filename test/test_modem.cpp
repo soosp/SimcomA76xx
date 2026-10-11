@@ -19,6 +19,10 @@ public:
     bool promptOk      = true;          ///< Answer AT+CMGS with "> "
     bool sendOk        = true;          ///< Answer the PDU with OK
     bool cmgfOk        = true;
+    bool promptSilent  = false;         ///< AT+CMGS gets no answer at all
+    const char* sendError = "+CMS ERROR: 500";   ///< Final line when !sendOk
+    const char* cmgfError = "ERROR";             ///< Final line when !cmgfOk
+    bool cmeeSet       = false;         ///< AT+CMEE=1 was received
     int  cereg         = 1;             ///< <stat> reported by AT+CEREG?
     int  creg          = 1;             ///< <stat> reported by AT+CREG?
     int  registerAfter = 0;             ///< CEREG turns 1 after this many queries
@@ -31,6 +35,9 @@ public:
         if (_rx.empty()) return -1;
         int c = (uint8_t)_rx.front(); _rx.pop_front(); return c;
     }
+    /// Unsolicited start-up lines, as after power-on.
+    void boot() { reply("\r\nRDY\r\n\r\n+CPIN: READY\r\n\r\nSMS DONE\r\n\r\nPB DONE\r\n"); }
+
     size_t write(const uint8_t* b, size_t n) override {
         writeCalls++;
         if (_inPdu) pduWriteCalls++;
@@ -47,14 +54,22 @@ private:
     size_t put(uint8_t c) {
         wire.push_back((char)c);
         if (_inPdu) {
-            if (c == 26) { _inPdu = false; reply(sendOk ? "\r\n+CMGS: 7\r\n\r\nOK\r\n" : "\r\n+CMS ERROR: 500\r\n\r\nERROR\r\n"); }
+            if (c == 26) {
+                _inPdu = false;
+                if (sendOk) reply("\r\n+CMGS: 7\r\n\r\nOK\r\n");
+                else { reply("\r\n"); reply(sendError); reply("\r\n"); }
+            }
             else if (c == 27) { _inPdu = false; }
             else pdu.push_back((char)c);
             return 1;
         }
         if (c == '\r') {
             commands.push_back(_line);
-            if (_line == "AT+CMGF=0")               reply(cmgfOk ? "\r\nOK\r\n" : "\r\nERROR\r\n");
+            if (_line == "AT+CMGF=0") {
+                if (cmgfOk) reply("\r\nOK\r\n");
+                else { reply("\r\n"); reply(cmgfError); reply("\r\n"); }
+            }
+            else if (_line == "AT+CMEE=1") { cmeeSet = true; reply("\r\nOK\r\n"); }
             else if (_line == "AT+CEREG?") {
                 regQueries++;
                 if (registerAfter > 0 && regQueries >= registerAfter) cereg = 1;
@@ -70,7 +85,8 @@ private:
             else if (_line == "AT+CNBP?")
                 reply("\r\n+CNBP: 0x0000000000000180,0x00000000080800C5\r\n\r\nOK\r\n");
             else if (_line.rfind("AT+CMGS=", 0) == 0) {
-                if (promptOk) { reply("\r\n> "); _inPdu = true; }
+                if (promptSilent) {}
+                else if (promptOk) { reply("\r\n> "); _inPdu = true; }
                 else          reply("\r\nERROR\r\n");
             }
             _line.clear();
@@ -277,6 +293,136 @@ int main() {
         SimcomA76xx modem;
         modem.begin(fm);
         CHECK(!modem.waitForNetwork(5000));
+    }
+
+    SECTION("lastError(): NONE after success, also after an earlier failure");
+    {
+        FakeModem fm;
+        fm.sendOk = false;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.sendSMS("+36301234567", "abc"));
+        CHECK(modem.lastError().error == ModemError::CMS_ERROR);
+        fm.sendOk = true;
+        CHECK(modem.sendSMS("+36301234567", "abc"));
+        CHECK(modem.lastError().error == ModemError::NONE);
+        CHECK(modem.lastError().code == -1);
+    }
+
+    SECTION("lastError(): numeric +CMS ERROR code");
+    {
+        FakeModem fm;
+        fm.sendOk = false;
+        fm.sendError = "+CMS ERROR: 1";
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.sendSMS("+36301234567", "abc"));
+        ModemResult r = modem.lastError();
+        CHECK(r.error == ModemError::CMS_ERROR && r.code == 1);
+        CHECK(SimcomA76xx::isPermanentSmsError(r.code));
+    }
+
+    SECTION("lastError(): transient +CMS ERROR (network timeout, 332)");
+    {
+        FakeModem fm;
+        fm.sendOk = false;
+        fm.sendError = "+CMS ERROR: 332";
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.sendSMS("+36301234567", "abc"));
+        CHECK(modem.lastError().code == 332);
+        CHECK(!SimcomA76xx::isPermanentSmsError(modem.lastError().code));
+    }
+
+    SECTION("lastError(): verbose report (CMEE=2) gives code -1");
+    {
+        FakeModem fm;
+        fm.sendOk = false;
+        fm.sendError = "+CMS ERROR: Network timeout";
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.sendSMS("+36301234567", "abc"));
+        CHECK(modem.lastError().error == ModemError::CMS_ERROR);
+        CHECK(modem.lastError().code == -1);
+    }
+
+    SECTION("lastError(): +CME ERROR on AT+CMGF");
+    {
+        FakeModem fm;
+        fm.cmgfOk = false;
+        fm.cmgfError = "+CME ERROR: 10";
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.sendSMS("+36301234567", "abc"));
+        CHECK(modem.lastError().error == ModemError::CME_ERROR);
+        CHECK(modem.lastError().code == 10);
+    }
+
+    SECTION("lastError(): prompt refused (ERROR) vs. prompt never came");
+    {
+        FakeModem fm;
+        fm.promptOk = false;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.sendSMS("+36301234567", "abc"));
+        CHECK(modem.lastError().error == ModemError::AT_ERROR);
+
+        FakeModem fm2;
+        fm2.promptSilent = true;
+        SimcomA76xx modem2;
+        modem2.begin(fm2);
+        CHECK(!modem2.sendSMS("+36301234567", "abc"));
+        CHECK(modem2.lastError().error == ModemError::NO_PROMPT);
+        CHECK(!fm2.wire.empty() && fm2.wire.back() == 27);
+    }
+
+    SECTION("lastError(): bad number and missing begin() never reach the modem");
+    {
+        FakeModem fm;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.sendSMS("+36 30", "abc"));
+        CHECK(modem.lastError().error == ModemError::INVALID_ARGUMENT);
+        CHECK(fm.wire.empty());
+
+        SimcomA76xx idle;
+        CHECK(!idle.sendSMS("+36301234567", "abc"));
+        CHECK(idle.lastError().error == ModemError::NOT_STARTED);
+    }
+
+    SECTION("lastError(): sendAT() without an answer is a TIMEOUT");
+    {
+        FakeModem fm;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.sendAT("AT+UNKNOWN", "OK", 100));
+        CHECK(modem.lastError().error == ModemError::TIMEOUT);
+    }
+
+    SECTION("waitForReady(): PB DONE, then numeric error reports (AT+CMEE=1)");
+    {
+        FakeModem fm;
+        fm.boot();
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(modem.waitForReady(20000));
+        CHECK(fm.cmeeSet);
+        CHECK(modem.lastError().error == ModemError::NONE);
+
+        FakeModem silent;
+        SimcomA76xx modem2;
+        modem2.begin(silent);
+        CHECK(!modem2.waitForReady(2000));
+        CHECK(modem2.lastError().error == ModemError::TIMEOUT);
+        CHECK(!silent.cmeeSet);
+    }
+
+    SECTION("isPermanentSmsError(): destination / PDU refused only");
+    {
+        const int16_t permanent[] = {1, 8, 10, 21, 28, 29, 30, 304};
+        for (int16_t c : permanent) CHECK(SimcomA76xx::isPermanentSmsError(c));
+        const int16_t transient[] = {-1, 0, 27, 38, 41, 42, 47, 331, 332, 500};
+        for (int16_t c : transient) CHECK(!SimcomA76xx::isPermanentSmsError(c));
     }
 
     SECTION("analyzeSMS() needs no modem");

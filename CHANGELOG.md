@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `lastError()`: why the last AT transaction failed (`ModemError`: plain
+  `ERROR`, `+CME ERROR`, `+CMS ERROR`, timeout, no SMS prompt, lock busy,
+  invalid argument, not started) and the `+CME`/`+CMS` code
+- `isPermanentSmsError()`: `+CMS ERROR` codes where resending to the same
+  number cannot succeed
+
+### Changed
+
+- `waitForReady()` sets numeric error reports (`AT+CMEE=1`) once the modem is
+  ready, so error codes can be read
+
 ## [0.4.1] - 2026-10-11
 
 ### Fixed

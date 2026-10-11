@@ -120,11 +120,46 @@ struct SupportedBands {
     bool gsm1800;     ///< true if GSM 1800 MHz (DCS) is enabled
 };
 
+/**
+ * @brief What went wrong in the last AT transaction (see lastError()).
+ */
+enum class ModemError : uint8_t {
+    NONE = 0,          ///< The last transaction succeeded
+    AT_ERROR,          ///< Plain "ERROR"
+    CME_ERROR,         ///< "+CME ERROR" (equipment / SIM / network)
+    CMS_ERROR,         ///< "+CMS ERROR" (SMS service, 3GPP TS 27.005)
+    TIMEOUT,           ///< No final response within the time limit
+    NO_PROMPT,         ///< sendSMS(): the "> " prompt did not come
+    BUSY,              ///< The modem lock could not be taken (ESP32)
+    INVALID_ARGUMENT,  ///< Refused before contacting the modem (e.g. number)
+    NOT_STARTED        ///< begin() has not been called
+};
+
+/**
+ * @brief The last error: its kind and, for +CME/+CMS ERROR, the code.
+ */
+struct ModemResult {
+    ModemError error;  ///< Kind of error; NONE on success
+    int16_t    code;   ///< +CME/+CMS code; -1 if none or not numeric
+};
+
 class SimcomA76xx {
 private:
     Stream* _serial;
     char _lineBuf[256];
     int8_t _pwrPin;
+    ModemResult _lastError;
+
+    /**
+     * @brief Records _lineBuf as the last error if it is a final error line.
+     * @return true if the line was ERROR, +CME ERROR or +CMS ERROR.
+     */
+    bool takeErrorLine();
+
+    void setError(ModemError e, int16_t code = -1) {
+        _lastError.error = e;
+        _lastError.code  = code;
+    }
 
     // Measured boot time: ~13s. 20000ms provides safe margin.
     static const uint32_t WAIT_READY_TIMEOUT_MS  = 20000;
@@ -238,6 +273,10 @@ public:
 
     /**
      * @brief Blocks until the modem signals it is ready by sending 'PB DONE'.
+     *
+     * Then switches error reports to numeric codes (AT+CMEE=1), so that
+     * lastError() can return the +CME/+CMS code.
+     *
      * @param timeoutMs Maximum time to wait in milliseconds.
      * @return true if the modem became ready within the timeout, false otherwise.
      */
@@ -439,6 +478,45 @@ public:
     static SmsInfo analyzeSMS(const char* message,
                               SmsEncoding encoding = SmsEncoding::AUTO) {
         return SmsPdu::analyze(message, encoding);
+    }
+
+    /**
+     * @brief Why the last AT transaction failed (NONE if it succeeded).
+     *
+     * Covers every call that talks to the modem: after sendSMS() returned
+     * false it tells a bad number (INVALID_ARGUMENT), a missing prompt, a
+     * timeout, or the network's +CMS ERROR code apart. The +CME/+CMS code is
+     * numeric once waitForReady() has set AT+CMEE=1; with verbose reports
+     * (CMEE=2) it is -1.
+     *
+     * Kept per object: read it right after the call, from the task that made
+     * it. If several tasks use the modem, another call in between overwrites
+     * it.
+     */
+    ModemResult lastError() const { return _lastError; }
+
+    /**
+     * @brief True for +CMS ERROR codes after which resending the same message
+     *        to the same number cannot succeed.
+     *
+     * The destination is refused or unknown (1 unassigned number,
+     * 8 operator determined barring, 10 call barred, 21 transfer rejected,
+     * 28 unidentified subscriber, 29 facility rejected, 30 unknown
+     * subscriber) or the PDU is refused (304 invalid PDU mode parameter).
+     * Everything else — network out of order, congestion, network timeout
+     * (332), no service (331), unknown (500) — may pass on a later attempt.
+     *
+     * A number that does not exist is often accepted by the network all the
+     * same (+CMGS: OK) and fails only at delivery, which is not reported.
+     */
+    static bool isPermanentSmsError(int16_t cmsCode) {
+        switch (cmsCode) {
+            case 1: case 8: case 10: case 21: case 28: case 29: case 30:
+            case 304:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**

@@ -7,6 +7,7 @@
 
 SimcomA76xx::SimcomA76xx() : _serial(NULL), _pwrPin(-1), _mutexTimeout(10000) {
     memset(_lineBuf, 0, sizeof(_lineBuf));
+    setError(ModemError::NONE);
 #ifdef ARDUINO_ARCH_ESP32
     _mutex = xSemaphoreCreateRecursiveMutex();
 #endif
@@ -14,7 +15,9 @@ SimcomA76xx::SimcomA76xx() : _serial(NULL), _pwrPin(-1), _mutexTimeout(10000) {
 
 bool SimcomA76xx::_lock(uint32_t timeoutMs) {
 #ifdef ARDUINO_ARCH_ESP32
-    return xSemaphoreTakeRecursive(_mutex, pdMS_TO_TICKS(timeoutMs)) == pdTRUE;
+    if (xSemaphoreTakeRecursive(_mutex, pdMS_TO_TICKS(timeoutMs)) == pdTRUE) return true;
+    setError(ModemError::BUSY);
+    return false;
 #else
     (void)timeoutMs; // unused on non-ESP32
     return true;
@@ -90,26 +93,49 @@ bool SimcomA76xx::readLine(uint32_t timeout) {
     return false;
 }
 
+bool SimcomA76xx::takeErrorLine() {
+    ModemError e;
+    if (strcmp(_lineBuf, "ERROR") == 0)                e = ModemError::AT_ERROR;
+    else if (strncmp(_lineBuf, "+CME ERROR", 10) == 0) e = ModemError::CME_ERROR;
+    else if (strncmp(_lineBuf, "+CMS ERROR", 10) == 0) e = ModemError::CMS_ERROR;
+    else return false;
+
+    int16_t code = -1;
+    if (e != ModemError::AT_ERROR) {
+        const char* p = _lineBuf + 10;
+        if (*p == ':') p++;
+        while (*p == ' ') p++;
+        if (*p >= '0' && *p <= '9') {
+            int32_t v = 0;
+            while (*p >= '0' && *p <= '9' && v < 10000) v = v * 10 + (*p++ - '0');
+            if (*p == '\0' || *p == ' ') code = (int16_t)v;
+        }
+    }
+    setError(e, code);
+    return true;
+}
+
 bool SimcomA76xx::waitForResponse(const char* expected, uint32_t timeout) {
     if (!_lock(_mutexTimeout)) return false;
 
     bool result = false;
+    bool failed = false;
     uint32_t start = millis();
     while (millis() - start < timeout) {
         if (readLine(timeout - (millis() - start))) {
-            if (strcmp(_lineBuf, expected) == 0)          { result = true;  break; }
-            if (strcmp(_lineBuf, "ERROR") == 0)           { result = false; break; }
-            if (strncmp(_lineBuf, "+CME ERROR", 10) == 0) { result = false; break; }
-            if (strncmp(_lineBuf, "+CMS ERROR", 10) == 0) { result = false; break; }
+            if (strcmp(_lineBuf, expected) == 0) { result = true; break; }
+            if (takeErrorLine())                 { failed = true; break; }
         }
     }
+    if (result)       setError(ModemError::NONE);
+    else if (!failed) setError(ModemError::TIMEOUT);
     _unlock();
     return result;
 }
 
 bool SimcomA76xx::sendAT(const char* command, const char* expectedResponse,
                           uint32_t timeout, bool multiline) {
-    if (!_serial) return false;
+    if (!_serial) { setError(ModemError::NOT_STARTED); return false; }
     if (!_lock(_mutexTimeout)) return false;
 
     while (_serial->available()) _serial->read();
@@ -117,16 +143,17 @@ bool SimcomA76xx::sendAT(const char* command, const char* expectedResponse,
     _serial->print('\r');
 
     bool result = false;
+    bool failed = false;
     uint32_t start = millis();
     while (millis() - start < timeout) {
         if (readLine(timeout - (millis() - start))) {
-            if (strcmp(_lineBuf, "ERROR") == 0)           { result = false; break; }
-            if (strncmp(_lineBuf, "+CME ERROR", 10) == 0) { result = false; break; }
-            if (strncmp(_lineBuf, "+CMS ERROR", 10) == 0) { result = false; break; }
-            if (strcmp(_lineBuf, expectedResponse) == 0)  { result = true;  break; }
+            if (takeErrorLine())                         { failed = true; break; }
+            if (strcmp(_lineBuf, expectedResponse) == 0) { result = true; break; }
             if (multiline && strstr(_lineBuf, expectedResponse)) { result = true; break; }
         }
     }
+    if (result)       setError(ModemError::NONE);
+    else if (!failed) setError(ModemError::TIMEOUT);
     _unlock();
     return result;
 }
@@ -163,6 +190,14 @@ bool SimcomA76xx::waitForReady(uint32_t timeoutMs) {
             if (strstr(_lineBuf, "PB DONE")) { result = true; break; }
         }
         _wait(10);
+    }
+    if (result) {
+        // Numeric +CME/+CMS codes for lastError(); a failure here does not
+        // make the modem less ready
+        sendAT("AT+CMEE=1", "OK", 2000);
+        setError(ModemError::NONE);
+    } else {
+        setError(ModemError::TIMEOUT);
     }
     _unlock();
     return result;
@@ -429,7 +464,11 @@ bool SimcomA76xx::sendSMS(const char* phoneNumber, const char* message,
                           SmsInfo* info) {
     SmsInfo text = SmsPdu::analyze(message, encoding);
     if (info) *info = text;
-    if (!_serial || !SmsPdu::validNumber(phoneNumber)) return false;
+    if (!_serial) { setError(ModemError::NOT_STARTED); return false; }
+    if (!SmsPdu::validNumber(phoneNumber)) {
+        setError(ModemError::INVALID_ARGUMENT);
+        return false;
+    }
     if (!_lock(_mutexTimeout + SEND_SMS_DURATION_MS)) return false;
 
     bool result = false;
@@ -447,6 +486,7 @@ bool SimcomA76xx::sendSMS(const char* phoneNumber, const char* message,
             result = waitForResponse("OK", SEND_SMS_RESULT_TIMEOUT_MS);
         } else {
             _serial->write(27); // ESC: abandon a prompt that may still come
+            if (_lastError.error == ModemError::TIMEOUT) setError(ModemError::NO_PROMPT);
         }
     }
     _unlock();

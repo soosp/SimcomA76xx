@@ -147,6 +147,10 @@ if (modem.sendSMS("+36301234567", "Hűtőkamra riasztás: -8,5 °C", 24 * 60,
   that window fails with `+CMS ERROR: Network timeout`. `waitForNetwork()`
   waits for registration (LTE, or GSM as a fallback); an application with
   other work to do should poll `isNetworkReady()` from its own loop instead.
+- When `sendSMS()` fails, `lastError()` tells why: a bad number, no prompt, a
+  timeout, or the network's `+CMS ERROR` code.
+  `SimcomA76xx::isPermanentSmsError(code)` separates the codes where a retry
+  cannot help (the number is refused) from the ones worth retrying.
 - `SimcomA76xx::analyzeSMS(text)` returns the same `SmsInfo` without a modem —
   useful to warn on a settings page that a message template will be cut.
 

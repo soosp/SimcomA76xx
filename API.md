@@ -14,7 +14,8 @@ Initializes the library with a serial interface and an optional power pin.
 #### `bool waitForReady(uint32_t timeoutMs = 20000)`
 
 Blocks execution until the modem sends the `PB DONE` string, indicating it is
-fully booted.
+fully booted. Then sets numeric error reports (`AT+CMEE=1`), so that
+`lastError()` can return the `+CME ERROR` / `+CMS ERROR` code.
 
 - **Returns**: `true` if ready, `false` on timeout.
 
@@ -207,6 +208,64 @@ How `sendSMS()` would encode `message`, without contacting the modem.
 |`capacity`|160 or 70|
 |`inputUsed`|Bytes of the UTF-8 input that fit|
 |`truncated`|The text did not fit and was cut|
+
+#### `ModemResult lastError() const`
+
+Why the last AT transaction failed: every call that talks to the modem sets
+it, success included (`ModemError::NONE`).
+
+|`ModemError`|Meaning|
+|---|---|
+|`NONE`|The last transaction succeeded|
+|`AT_ERROR`|Plain `ERROR`|
+|`CME_ERROR`|`+CME ERROR` (equipment, SIM, network); `code` is set|
+|`CMS_ERROR`|`+CMS ERROR` (SMS service, 3GPP TS 27.005); `code` is set|
+|`TIMEOUT`|No final response within the time limit|
+|`NO_PROMPT`|`sendSMS()`: the `>` prompt did not come|
+|`BUSY`|The modem lock could not be taken (ESP32)|
+|`INVALID_ARGUMENT`|Refused before contacting the modem (e.g. the number)|
+|`NOT_STARTED`|`begin()` has not been called|
+
+`ModemResult::code` is the numeric `+CME`/`+CMS` code, or -1 when there is
+none or the modem reports in words (`AT+CMEE=2`). `waitForReady()` switches
+to numeric codes.
+
+The value is kept per object: read it right after the call, from the task
+that made it. If several tasks use the modem, a call in between overwrites
+it.
+
+```cpp
+if (!modem.sendSMS(number, text)) {
+    ModemResult r = modem.lastError();
+    if (r.error == ModemError::CMS_ERROR &&
+        SimcomA76xx::isPermanentSmsError(r.code)) {
+        // this number will not work: do not retry
+    } else {
+        // network or modem problem: retry later
+    }
+}
+```
+
+#### `static bool isPermanentSmsError(int16_t cmsCode)`
+
+`true` for `+CMS ERROR` codes after which sending the same message to the same
+number again cannot succeed:
+
+|Code|Meaning|
+|---|---|
+|1|Unassigned (unallocated) number|
+|8|Operator determined barring|
+|10|Call barred|
+|21|Short message transfer rejected|
+|28|Unidentified subscriber|
+|29|Facility rejected|
+|30|Unknown subscriber|
+|304|Invalid PDU mode parameter|
+
+Every other code — network out of order, congestion, no network service
+(331), network timeout (332), unknown error (500) — may pass on a later
+attempt. A number that does not exist is often accepted all the same (`OK`
+after `+CMGS:`) and fails only at delivery, which `sendSMS()` does not see.
 
 #### `bool forceReattach()`
 
