@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- AVR and ESP8266 builds: the cores' `binary.h` defines `B1` as a macro, which
+  broke the `Bands::B1` declaration; the macro is set aside around it. On
+  these cores user code cannot write `Bands::B1` (use its value, 1)
+
 ## [0.4.0] - 2026-10-11
 
 ### Added

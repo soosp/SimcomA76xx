@@ -54,6 +54,9 @@ Sets the preferred radio technology.
 Restricts the modem to specific frequency bands. Use `Bands::LTE` and
 `Bands::GSM` constants.
 
+On AVR and ESP8266 the core defines `B1` as a macro (binary.h), so
+`Bands::B1` cannot be written there; use its value, `1` (band 1 is bit 0).
+
 > **Note**: Band changes may require a radio cycle to take effect. On some
 > firmware versions the modem handles reattachment automatically after
 > `setAllowedBands()`. If the new configuration is not applied, call

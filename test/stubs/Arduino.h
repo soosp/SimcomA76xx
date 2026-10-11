@@ -20,3 +20,7 @@ inline void pinMode(int, int) {}
 inline void digitalWrite(int, int) {}
 
 #include "Stream.h"
+
+// The AVR and ESP8266 cores define binary constants as macros (binary.h).
+// B1 collides with Bands::B1; defining it here keeps that covered.
+#define B1 1

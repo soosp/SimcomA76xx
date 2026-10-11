@@ -63,7 +63,14 @@ namespace Bands {
 
     /**
      * @brief LTE band bitmasks for use with setAllowedBands() and isBandValid().
+     *
+     * The AVR and ESP8266 cores define B1 as a macro (binary.h), which would
+     * turn Bands::B1 into Bands::1. It is set aside while the enum is
+     * declared; on those cores user code cannot write Bands::B1, but can use
+     * its value, 1 (band 1 is bit 0).
      */
+#pragma push_macro("B1")
+#undef B1
     enum LTE : uint64_t {
         LTE_NONE = 0x0,           ///< No LTE band
         B1  = 1ULL << 0,          ///< LTE Band 1  (2100 MHz)
@@ -74,6 +81,7 @@ namespace Bands {
         B28 = 1ULL << 27,         ///< LTE Band 28 (700 MHz)
         ALL = 0xFFFFFFFFFFFFFFFFULL ///< All LTE bands
     };
+#pragma pop_macro("B1")
 };
 
 /**

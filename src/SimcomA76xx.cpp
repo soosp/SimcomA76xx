@@ -224,7 +224,10 @@ bool SimcomA76xx::getSupportedBands(SupportedBands* bands) {
                 bands->gsmMask = hexToUint64(gsmPart);
                 ltePart++;
                 bands->lteMask = hexToUint64(ltePart);
+#pragma push_macro("B1")   // a macro on AVR and ESP8266 (binary.h)
+#undef B1
                 bands->lteB1   = (bands->lteMask & Bands::B1);
+#pragma pop_macro("B1")
                 bands->lteB3   = (bands->lteMask & Bands::B3);
                 bands->lteB7   = (bands->lteMask & Bands::B7);
                 bands->lteB8   = (bands->lteMask & Bands::B8);
