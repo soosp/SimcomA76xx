@@ -123,6 +123,9 @@ void loop() {
 ## Sending SMS
 
 ```cpp
+modem.waitForReady();       // modem and SIM up ("PB DONE")
+modem.waitForNetwork();     // registered (blocking; see below)
+
 SmsInfo info;
 if (modem.sendSMS("+36301234567", "Hűtőkamra riasztás: -8,5 °C", 24 * 60,
                   SmsEncoding::AUTO, &info)) {
@@ -135,6 +138,10 @@ if (modem.sendSMS("+36301234567", "Hűtőkamra riasztás: -8,5 °C", 24 * 60,
   is refused without contacting the modem.
 - `validityMinutes` (here 24 h) tells the network how long to keep trying if
   the phone is unreachable; 0 leaves it to the network.
+- `waitForReady()` returns before the modem is registered, and an SMS sent in
+  that window fails with `+CMS ERROR: Network timeout`. `waitForNetwork()`
+  waits for registration (LTE, or GSM as a fallback); an application with
+  other work to do should poll `isNetworkReady()` from its own loop instead.
 - `SimcomA76xx::analyzeSMS(text)` returns the same `SmsInfo` without a modem —
   useful to warn on a settings page that a message template will be cut.
 

@@ -80,13 +80,16 @@ namespace Bands {
  * @brief Network registration states based on 3GPP TS 27.007 (AT+CEREG).
  */
 enum RegistrationStatus {
-    REG_NOT_REGISTERED = 0,  ///< Not registered, not searching
-    REG_HOME           = 1,  ///< Registered on home network
-    REG_SEARCHING      = 2,  ///< Not registered, but currently searching
-    REG_DENIED         = 3,  ///< Registration denied
-    REG_UNKNOWN        = 4,  ///< Unknown state (e.g. out of coverage)
-    REG_ROAMING        = 5,  ///< Registered on a roaming partner network
-    REG_ERROR          = -1  ///< Library error (communication failed)
+    REG_NOT_REGISTERED   = 0,  ///< Not registered, not searching
+    REG_HOME             = 1,  ///< Registered on home network
+    REG_SEARCHING        = 2,  ///< Not registered, but currently searching
+    REG_DENIED           = 3,  ///< Registration denied
+    REG_UNKNOWN          = 4,  ///< Unknown state (e.g. out of coverage)
+    REG_ROAMING          = 5,  ///< Registered on a roaming partner network
+    REG_SMS_ONLY_HOME    = 6,  ///< Registered for SMS only, home network
+    REG_SMS_ONLY_ROAMING = 7,  ///< Registered for SMS only, roaming
+    REG_EMERGENCY_ONLY   = 11, ///< Attached for emergency bearer services only
+    REG_ERROR            = -1  ///< Library error (communication failed)
 };
 
 /**
@@ -121,8 +124,22 @@ private:
     // AT+CFUN=0 (5000) + settling (1500) + AT+CFUN=1 (5000) + waitForReady (20000)
     static const uint32_t FORCE_REATTACH_DURATION_MS = 31500;
 
-    // AT+CMGS prompt (5000) + message send (30000) + margin
-    static const uint32_t SEND_SMS_DURATION_MS = 37000;
+    // AT+CMGS result: the AT manual gives 40 s as the maximum response time
+    static const uint32_t SEND_SMS_RESULT_TIMEOUT_MS = 45000;
+
+    // AT+CMGF (2000) + AT+CMGS prompt (5000) + message send + margin
+    static const uint32_t SEND_SMS_DURATION_MS = 2000 + 5000 + SEND_SMS_RESULT_TIMEOUT_MS + 2000;
+
+    // Poll interval of waitForNetwork()
+    static const uint32_t NETWORK_POLL_MS = 1000;
+
+    /**
+     * @brief Queries one registration command (AT+CEREG? or AT+CREG?).
+     * @param command  The read command.
+     * @param prefix   Its response prefix, e.g. "+CEREG:".
+     * @return The <stat> value, or REG_ERROR.
+     */
+    RegistrationStatus queryRegistration(const char* command, const char* prefix);
 
 #ifdef ARDUINO_ARCH_ESP32
     SemaphoreHandle_t _mutex;
@@ -309,6 +326,43 @@ public:
      * @return A RegistrationStatus value, or REG_ERROR on communication failure.
      */
     RegistrationStatus getRegistrationStatus();
+
+    /**
+     * @brief True for the states in which SMS can be sent: home, roaming,
+     *        and "registered for SMS only" (home or roaming).
+     */
+    static bool isRegistered(RegistrationStatus status) {
+        return status == REG_HOME || status == REG_ROAMING ||
+               status == REG_SMS_ONLY_HOME || status == REG_SMS_ONLY_ROAMING;
+    }
+
+    /**
+     * @brief Checks once, without waiting, whether the modem is registered.
+     *
+     * Asks AT+CEREG? (LTE) first and, if that is not registered, AT+CREG?
+     * (circuit-switched), so a modem that fell back to GSM also counts.
+     * "PB DONE" (waitForReady()) only means the modem and the SIM are up;
+     * registration typically follows some seconds later, and an SMS sent
+     * before it fails with "+CMS ERROR: Network timeout".
+     *
+     * Non-blocking apart from the two AT commands — the building block for
+     * an application's own state machine.
+     *
+     * @return true if registered (see isRegistered()).
+     */
+    bool isNetworkReady();
+
+    /**
+     * @brief Waits until the modem is registered (see isNetworkReady()).
+     *
+     * Blocking: polls once a second. Meant for examples and start-up code;
+     * an application with other work to do should call isNetworkReady()
+     * from its own loop instead. The modem lock is not held between polls.
+     *
+     * @param timeoutMs  Maximum time to wait. Default 60 s.
+     * @return true once registered, false on timeout.
+     */
+    bool waitForNetwork(uint32_t timeoutMs = 60000);
 
     /**
      * @brief Retrieves the network operator name in alphanumeric format.

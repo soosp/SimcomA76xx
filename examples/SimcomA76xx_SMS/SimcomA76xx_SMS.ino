@@ -2,7 +2,12 @@
  * SimcomA76xx — SMS
  *
  * Shows how a few texts would be encoded (no modem needed for that), then
- * sends one SMS with a 24-hour validity period.
+ * waits for the modem and the network and sends one SMS with a 24-hour
+ * validity period.
+ *
+ * The waits here block, which is fine for an example. An application with
+ * other work to do should poll isNetworkReady() from its own loop instead of
+ * calling waitForNetwork().
  *
  * Set PHONE_NUMBER to your own number (digits, optionally with a leading '+'
  * for the international form) and the pins to
@@ -45,6 +50,7 @@ void setup() {
     show("Freezer alarm: -8.5 C");                   // ASCII
     show("Kühlraum Alarm: -8,5 °C");                 // ü in GSM, ° is not -> UCS2
     show("Hűtőkamra riasztás: -8,5 C");              // ű ő á -> UCS2
+    show("Árvíztűrő tükörfúrógép");                  // Hungarian accented letters -> UCS2
     show("Price: 10 € [approx]");                    // € [ ] take two septets
 
 #if defined(ARDUINO_ARCH_ESP32)
@@ -58,6 +64,13 @@ void setup() {
     if (!SEND) return;
     if (!modem.waitForReady()) {
         Serial.println("Modem not ready");
+        return;
+    }
+    // "PB DONE" only means the modem and the SIM are up; registration follows
+    // some seconds later. An SMS sent before it fails ("Network timeout").
+    Serial.println("Waiting for network...");
+    if (!modem.waitForNetwork(60000)) {
+        Serial.println("Not registered (no coverage, SIM or antenna problem?)");
         return;
     }
     SmsInfo info;

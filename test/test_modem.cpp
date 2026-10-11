@@ -16,9 +16,13 @@ public:
     std::string            wire;        ///< Everything the library wrote
     std::vector<std::string> commands;  ///< Command lines (without \r)
     std::string            pdu;         ///< Text written after the prompt, up to Ctrl+Z
-    bool promptOk = true;               ///< Answer AT+CMGS with "> "
-    bool sendOk   = true;               ///< Answer the PDU with OK
-    bool cmgfOk   = true;
+    bool promptOk      = true;          ///< Answer AT+CMGS with "> "
+    bool sendOk        = true;          ///< Answer the PDU with OK
+    bool cmgfOk        = true;
+    int  cereg         = 1;             ///< <stat> reported by AT+CEREG?
+    int  creg          = 1;             ///< <stat> reported by AT+CREG?
+    int  registerAfter = 0;             ///< CEREG turns 1 after this many queries
+    int  regQueries    = 0;
 
     int available() override { return (int)_rx.size(); }
     int read() override {
@@ -36,6 +40,18 @@ public:
         if (c == '\r') {
             commands.push_back(_line);
             if (_line == "AT+CMGF=0")               reply(cmgfOk ? "\r\nOK\r\n" : "\r\nERROR\r\n");
+            else if (_line == "AT+CEREG?") {
+                regQueries++;
+                if (registerAfter > 0 && regQueries >= registerAfter) cereg = 1;
+                char b[48];
+                snprintf(b, sizeof(b), "\r\n+CEREG: 0,%d\r\n\r\nOK\r\n", cereg);
+                reply(b);
+            }
+            else if (_line == "AT+CREG?") {
+                char b[48];
+                snprintf(b, sizeof(b), "\r\n+CREG: 0,%d\r\n\r\nOK\r\n", creg);
+                reply(b);
+            }
             else if (_line == "AT+CNBP?")
                 reply("\r\n+CNBP: 0x0000000000000180,0x00000000080800C5\r\n\r\nOK\r\n");
             else if (_line.rfind("AT+CMGS=", 0) == 0) {
@@ -157,6 +173,75 @@ int main() {
         CHECK(b.lteMask == 0x080800C5ULL);
         CHECK(b.gsm900 && b.gsm1800);
         CHECK(b.lteB1 && b.lteB3 && b.lteB7 && b.lteB8 && b.lteB20 && b.lteB28);
+    }
+
+    SECTION("isRegistered(): states that can send SMS");
+    {
+        CHECK(SimcomA76xx::isRegistered(REG_HOME));
+        CHECK(SimcomA76xx::isRegistered(REG_ROAMING));
+        CHECK(SimcomA76xx::isRegistered(REG_SMS_ONLY_HOME));
+        CHECK(SimcomA76xx::isRegistered(REG_SMS_ONLY_ROAMING));
+        CHECK(!SimcomA76xx::isRegistered(REG_SEARCHING));
+        CHECK(!SimcomA76xx::isRegistered(REG_NOT_REGISTERED));
+        CHECK(!SimcomA76xx::isRegistered(REG_DENIED));
+        CHECK(!SimcomA76xx::isRegistered(REG_UNKNOWN));
+        CHECK(!SimcomA76xx::isRegistered(REG_EMERGENCY_ONLY));
+        CHECK(!SimcomA76xx::isRegistered(REG_ERROR));
+    }
+
+    SECTION("getRegistrationStatus() parses +CEREG");
+    {
+        FakeModem fm;
+        fm.cereg = 6;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(modem.getRegistrationStatus() == REG_SMS_ONLY_HOME);
+    }
+
+    SECTION("isNetworkReady(): LTE registered");
+    {
+        FakeModem fm;
+        fm.cereg = 1; fm.creg = 2;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(modem.isNetworkReady());
+    }
+
+    SECTION("isNetworkReady(): fell back to GSM (CREG registered, CEREG not)");
+    {
+        FakeModem fm;
+        fm.cereg = 2; fm.creg = 5;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(modem.isNetworkReady());
+    }
+
+    SECTION("isNetworkReady(): still searching");
+    {
+        FakeModem fm;
+        fm.cereg = 2; fm.creg = 2;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.isNetworkReady());
+    }
+
+    SECTION("waitForNetwork(): returns once registered");
+    {
+        FakeModem fm;
+        fm.cereg = 2; fm.creg = 2; fm.registerAfter = 5;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(modem.waitForNetwork(60000));
+        CHECK(fm.regQueries == 5);
+    }
+
+    SECTION("waitForNetwork(): times out");
+    {
+        FakeModem fm;
+        fm.cereg = 2; fm.creg = 0;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(!modem.waitForNetwork(5000));
     }
 
     SECTION("analyzeSMS() needs no modem");

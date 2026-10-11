@@ -318,20 +318,46 @@ int SimcomA76xx::getSignalQuality() {
     return rssi;
 }
 
-RegistrationStatus SimcomA76xx::getRegistrationStatus() {
+RegistrationStatus SimcomA76xx::queryRegistration(const char* command,
+                                                  const char* prefix) {
     if (!_serial) return REG_ERROR;
     if (!_lock(_mutexTimeout)) return REG_ERROR;
 
     RegistrationStatus result = REG_ERROR;
-    if (sendAT("AT+CEREG?", "+CEREG:", 1000, true)) {
+    if (sendAT(command, prefix, 1000, true)) {
+        const char* p = strstr(_lineBuf, prefix);
         int n, stat;
-        if (sscanf(_lineBuf, "+CEREG: %d,%d", &n, &stat) == 2)
-            result = (RegistrationStatus)stat;
-        else if (sscanf(_lineBuf, "+CEREG: %d", &stat) == 1)
-            result = (RegistrationStatus)stat;
+        if (p) {
+            p += strlen(prefix);
+            if (sscanf(p, " %d,%d", &n, &stat) == 2)
+                result = (RegistrationStatus)stat;
+            else if (sscanf(p, " %d", &stat) == 1)
+                result = (RegistrationStatus)stat;
+        }
     }
     _unlock();
     return result;
+}
+
+RegistrationStatus SimcomA76xx::getRegistrationStatus() {
+    return queryRegistration("AT+CEREG?", "+CEREG:");
+}
+
+bool SimcomA76xx::isNetworkReady() {
+    if (!_lock(_mutexTimeout)) return false;
+    bool ready = isRegistered(queryRegistration("AT+CEREG?", "+CEREG:")) ||
+                 isRegistered(queryRegistration("AT+CREG?", "+CREG:"));
+    _unlock();
+    return ready;
+}
+
+bool SimcomA76xx::waitForNetwork(uint32_t timeoutMs) {
+    uint32_t start = millis();
+    for (;;) {
+        if (isNetworkReady()) return true;
+        if (millis() - start >= timeoutMs) return false;
+        _wait(NETWORK_POLL_MS);
+    }
 }
 
 bool SimcomA76xx::getOperatorName(char* nameBuf, uint8_t maxLen) {
@@ -398,7 +424,7 @@ bool SimcomA76xx::sendSMS(const char* phoneNumber, const char* message,
             SmsPdu::write(writePduChar, _serial, phoneNumber, message, text,
                           validityMinutes);
             _serial->write(26); // Ctrl+Z to send
-            result = waitForResponse("OK", 30000);
+            result = waitForResponse("OK", SEND_SMS_RESULT_TIMEOUT_MS);
         } else {
             _serial->write(27); // ESC: abandon a prompt that may still come
         }

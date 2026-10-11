@@ -88,9 +88,12 @@ Queries the network registration state (`AT+CEREG?`).
 - `REG_HOME` (1): Registered on home network.
 - `REG_SEARCHING` (2): Not registered, but currently searching for an operator.
 - `REG_ROAMING` (5): Registered on a roaming partner network.
+- `REG_SMS_ONLY_HOME` (6) / `REG_SMS_ONLY_ROAMING` (7): Registered for SMS
+  only, home / roaming network.
 - `REG_NOT_REGISTERED` (0): Not registered and not searching.
 - `REG_DENIED` (3): Registration was rejected by the network.
 - `REG_UNKNOWN` (4): Unknown state (out of coverage).
+- `REG_EMERGENCY_ONLY` (11): Attached for emergency bearer services only.
 - `REG_ERROR` (-1): Communication error with the modem.
 
 ##### Application example
@@ -98,12 +101,35 @@ Queries the network registration state (`AT+CEREG?`).
 ```cpp
 RegistrationStatus reg = modem.getRegistrationStatus();
 
-if (reg == REG_HOME || reg == REG_ROAMING) {
+if (SimcomA76xx::isRegistered(reg)) {
     Serial.println("Network connection: OK");
 } else if (reg == REG_SEARCHING) {
     Serial.println("Searching for network...");
 }
 ```
+
+#### `static bool isRegistered(RegistrationStatus status)`
+
+`true` for the states in which SMS can be sent: `REG_HOME`, `REG_ROAMING`,
+`REG_SMS_ONLY_HOME`, `REG_SMS_ONLY_ROAMING`.
+
+#### `bool isNetworkReady()`
+
+Checks once, without waiting, whether the modem is registered: `AT+CEREG?`
+(LTE) first, then `AT+CREG?`, so a modem that fell back to GSM also counts.
+
+`waitForReady()` returns at `PB DONE`, when the modem and the SIM are up;
+registration typically follows some seconds later, and an SMS sent before it
+fails with `+CMS ERROR: Network timeout`. Call this from the application's
+own loop or state machine before sending.
+
+#### `bool waitForNetwork(uint32_t timeoutMs = 60000)`
+
+Blocking version of `isNetworkReady()`: polls once a second until the modem is
+registered or `timeoutMs` has passed. The modem lock is not held between
+polls. Meant for examples and start-up code.
+
+- **Returns**: `true` once registered, `false` on timeout.
 
 #### `bool getOperatorName(char* nameBuf, uint8_t maxLen)`
 
@@ -153,6 +179,9 @@ streamed to the modem as it is encoded.
 - **Returns**: `true` if the modem accepted the message (`OK` after
   `+CMGS:`); `false` on an invalid number, a missing `>` prompt (an ESC is
   then sent), `ERROR`, `+CME ERROR`, `+CMS ERROR` or a timeout.
+
+The result is awaited for up to 45 s (the AT manual gives 40 s as the
+maximum). Send only once the modem is registered — see `isNetworkReady()`.
 
 One SMS holds 160 GSM 7-bit septets (`€ [ ] { } ~ ^ \ |` take two) or 70
 UTF-16 units (an emoji takes two). Longer text is cut at a character boundary

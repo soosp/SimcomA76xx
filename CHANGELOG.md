@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `isNetworkReady()` (non-blocking, `AT+CEREG?` then `AT+CREG?`),
+  `waitForNetwork()` (blocking) and `isRegistered()`: wait for registration
+  before sending, since `waitForReady()` returns before it
+- `RegistrationStatus` values `REG_SMS_ONLY_HOME`, `REG_SMS_ONLY_ROAMING` and
+  `REG_EMERGENCY_ONLY`
+- Example `SimcomA76xx_SMS` waits for registration before sending
+
+### Changed
+
+- `sendSMS()` waits up to 45 s for the result (was 30 s); the AT manual gives
+  40 s as the maximum response time of `AT+CMGS`
+
 ## [0.3.0] - 2026-10-08
 
 ### Added
