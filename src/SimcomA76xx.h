@@ -141,6 +141,11 @@ private:
     // Poll interval of waitForNetwork()
     static const uint32_t NETWORK_POLL_MS = 1000;
 
+    // The PDU goes to the port in pieces of this many characters (it is up to
+    // 318 hex digits). One write() per piece instead of per digit: a queued
+    // port such as SafeSerial turns each write() into one queue item.
+    static const uint8_t PDU_CHUNK_SIZE = 64;
+
     /**
      * @brief Queries one registration command (AT+CEREG? or AT+CREG?).
      * @param command  The read command.

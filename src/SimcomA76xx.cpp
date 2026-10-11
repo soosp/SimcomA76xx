@@ -405,9 +405,23 @@ uint32_t SimcomA76xx::getCellId() {
     return result;
 }
 
-/// SmsPdu sink: one hex digit straight to the modem.
+/// SmsPdu sink: collects hex digits and writes them to the modem in pieces.
+struct PduWriter {
+    Stream*  port;
+    uint8_t  used;
+    uint8_t* buf;
+    uint8_t  size;
+
+    void flush() {
+        if (used) port->write(buf, used);
+        used = 0;
+    }
+};
+
 static void writePduChar(char c, void* ctx) {
-    static_cast<Stream*>(ctx)->write((uint8_t)c);
+    PduWriter* w = static_cast<PduWriter*>(ctx);
+    w->buf[w->used++] = (uint8_t)c;
+    if (w->used == w->size) w->flush();
 }
 
 bool SimcomA76xx::sendSMS(const char* phoneNumber, const char* message,
@@ -424,8 +438,11 @@ bool SimcomA76xx::sendSMS(const char* phoneNumber, const char* message,
         snprintf(cmd, sizeof(cmd), "AT+CMGS=%u",
                  (unsigned)SmsPdu::tpduLength(phoneNumber, text, validityMinutes));
         if (sendAT(cmd, "> ", 5000)) {
-            SmsPdu::write(writePduChar, _serial, phoneNumber, message, text,
+            uint8_t   chunk[PDU_CHUNK_SIZE];
+            PduWriter writer = {_serial, 0, chunk, PDU_CHUNK_SIZE};
+            SmsPdu::write(writePduChar, &writer, phoneNumber, message, text,
                           validityMinutes);
+            writer.flush();
             _serial->write(26); // Ctrl+Z to send
             result = waitForResponse("OK", SEND_SMS_RESULT_TIMEOUT_MS);
         } else {

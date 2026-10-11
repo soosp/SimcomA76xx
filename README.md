@@ -120,6 +120,11 @@ void loop() {
 }
 ```
 
+SafeSerial turns every `write()` into one item of its TX queue (default 30
+items) and drops what does not fit. The library writes at most 64 characters
+per call — an SMS PDU takes up to 5 — so keep the queue at 10 items or more
+and `SAFESERIAL_LINE_BUFFER_SIZE` above 64.
+
 ## Sending SMS
 
 ```cpp

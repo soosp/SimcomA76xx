@@ -23,13 +23,28 @@ public:
     int  creg          = 1;             ///< <stat> reported by AT+CREG?
     int  registerAfter = 0;             ///< CEREG turns 1 after this many queries
     int  regQueries    = 0;
+    int  writeCalls    = 0;             ///< write() calls (a queued port: one item each)
+    int  pduWriteCalls = 0;             ///< ... of them while the PDU was being sent
 
     int available() override { return (int)_rx.size(); }
     int read() override {
         if (_rx.empty()) return -1;
         int c = (uint8_t)_rx.front(); _rx.pop_front(); return c;
     }
+    size_t write(const uint8_t* b, size_t n) override {
+        writeCalls++;
+        if (_inPdu) pduWriteCalls++;
+        for (size_t i = 0; i < n; i++) put(b[i]);
+        return n;
+    }
     size_t write(uint8_t c) override {
+        writeCalls++;
+        if (_inPdu) pduWriteCalls++;
+        return put(c);
+    }
+
+private:
+    size_t put(uint8_t c) {
         wire.push_back((char)c);
         if (_inPdu) {
             if (c == 26) { _inPdu = false; reply(sendOk ? "\r\n+CMGS: 7\r\n\r\nOK\r\n" : "\r\n+CMS ERROR: 500\r\n\r\nERROR\r\n"); }
@@ -65,7 +80,6 @@ public:
         return 1;
     }
 
-private:
     void reply(const char* s) { while (*s) _rx.push_back(*s++); }
     std::deque<char> _rx;
     std::string      _line;
@@ -108,6 +122,27 @@ int main() {
         // 1+1+1+1+6+1+1+1 header octets + 8 UD octets = 21
         CHECK_STR(fm.commands[1], "AT+CMGS=21");
         CHECK_STR(fm.pdu, "0001000B916303214365F7000808" "0048017100740151");
+    }
+
+    SECTION("longest PDU goes out in a few write() calls, not one per digit");
+    {
+        FakeModem fm;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        // 70 UCS-2 characters to a 20-digit number: 159 octets, 318 hex digits
+        std::string text;
+        for (int i = 0; i < 70; i++) text += "\xC5\x91";
+        SmsInfo info;
+        CHECK(modem.sendSMS("+12345678901234567890", text.c_str(), 1440,
+                            SmsEncoding::AUTO, &info));
+        CHECK(info.encoding == SmsEncoding::UCS2 && info.used == 70 && !info.truncated);
+        CHECK_STR(fm.commands[1], "AT+CMGS=158");
+        CHECK(fm.pdu.size() == 318);
+        // 64-digit pieces: 5 writes for the PDU, then Ctrl+Z (the 6th call
+        // is counted while the PDU is still open). SafeSerial's default
+        // 30-item TX queue takes it all.
+        CHECK(fm.pduWriteCalls == 6);
+        CHECK(fm.pdu.substr(fm.pdu.size() - 4) == "0151");
     }
 
     SECTION("invalid number: refused, modem untouched, info still filled");

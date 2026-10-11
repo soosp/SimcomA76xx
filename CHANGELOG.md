@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- `sendSMS()` writes the PDU in 64-character pieces instead of one `write()`
+  per hex digit. On a queued port such as SafeSerial every `write()` is one
+  queue item, and a PDU (up to 318 digits) overflowed the queue and arrived
+  cut short
 - AVR and ESP8266 builds: the cores' `binary.h` defines `B1` as a macro, which
   broke the `Bands::B1` declaration; the macro is set aside around it. On
   these cores user code cannot write `Bands::B1` (use its value, 1)
