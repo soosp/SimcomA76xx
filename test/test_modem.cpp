@@ -27,6 +27,8 @@ public:
     int  creg          = 1;             ///< <stat> reported by AT+CREG?
     int  registerAfter = 0;             ///< CEREG turns 1 after this many queries
     bool lateOk        = false;         ///< Query answers: the final OK comes a moment later
+    const char* cpin   = "READY";       ///< AT+CPIN? state; nullptr: no SIM (+CME ERROR: 10)
+    const char* iccid  = "8936300000123456789F";
     int  regQueries    = 0;
     int  writeCalls    = 0;             ///< write() calls (a queued port: one item each)
     int  pduWriteCalls = 0;             ///< ... of them while the PDU was being sent
@@ -98,6 +100,16 @@ private:
                 char b[48];
                 snprintf(b, sizeof(b), "\r\n+CREG: 0,%d\r\n\r\nOK\r\n", creg);
                 reply(b);
+            }
+            else if (_line == "AT+SIMEI?")
+                reply("\r\n+SIMEI: 861234050012345\r\n\r\nOK\r\n");
+            else if (_line == "AT+CICCID") {
+                if (cpin) { reply("\r\n+ICCID: "); reply(iccid); reply("\r\n\r\nOK\r\n"); }
+                else      reply("\r\n+CME ERROR: 10\r\n");
+            }
+            else if (_line == "AT+CPIN?") {
+                if (cpin) { reply("\r\n+CPIN: "); reply(cpin); reply("\r\n\r\nOK\r\n"); }
+                else      reply("\r\n+CME ERROR: 10\r\n");
             }
             else if (_line == "AT+CNBP?")
                 reply("\r\n+CNBP: 0x0000000000000180,0x00000000080800C5\r\n\r\nOK\r\n");
@@ -454,6 +466,48 @@ int main() {
         // The next command gets no answer: it must not take the query's OK
         CHECK(!modem.sendAT("AT+UNKNOWN", "OK", 100));
         CHECK(modem.lastError().error == ModemError::TIMEOUT);
+    }
+
+    SECTION("getIMEI(), getICCID()");
+    {
+        FakeModem fm;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        char imei[SimcomA76xx::IMEI_SIZE];
+        CHECK(modem.getIMEI(imei, sizeof(imei)));
+        CHECK_STR(imei, "861234050012345");
+        char iccid[SimcomA76xx::ICCID_SIZE];
+        CHECK(modem.getICCID(iccid, sizeof(iccid)));
+        CHECK_STR(iccid, "8936300000123456789F");
+        char tiny[8];
+        CHECK(!modem.getIMEI(tiny, sizeof(tiny)));          // does not fit
+        CHECK(tiny[0] == '\0');
+        CHECK(!modem.sendAT("AT+UNKNOWN", "OK", 100));       // OKs were consumed
+
+        FakeModem nosim;
+        nosim.cpin = nullptr;
+        SimcomA76xx m2;
+        m2.begin(nosim);
+        CHECK(!m2.getICCID(iccid, sizeof(iccid)));
+        CHECK(m2.lastError().error == ModemError::CME_ERROR && m2.lastError().code == 10);
+    }
+
+    SECTION("getSimStatus()");
+    {
+        struct Case { const char* cpin; SimStatus expect; };
+        const Case cases[] = {
+            {"READY", SIM_READY}, {"SIM PIN", SIM_PIN}, {"SIM PUK", SIM_PUK},
+            {"PH-SIM PIN", SIM_LOCKED}, {"SIM PIN2", SIM_LOCKED}, {nullptr, SIM_NOT_INSERTED}
+        };
+        for (const Case& c : cases) {
+            FakeModem fm;
+            fm.cpin = c.cpin;
+            SimcomA76xx modem;
+            modem.begin(fm);
+            CHECK(modem.getSimStatus() == c.expect);
+        }
+        SimcomA76xx idle;
+        CHECK(idle.getSimStatus() == SIM_ERROR);
     }
 
     SECTION("analyzeSMS() needs no modem");

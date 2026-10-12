@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `getIMEI()`, `getICCID()` and `getSimStatus()` (`SimStatus`): the modem
+  and SIM identity and the SIM state, for device status pages
+- Example `SimcomA76xx_Basic` prints the IMEI, the SIM state and the ICCID
+  at start-up
+
 ## [0.5.1] - 2026-10-12
 
 ### Fixed

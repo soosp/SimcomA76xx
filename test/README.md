@@ -29,7 +29,7 @@ elsewhere, edit that entry in `.vscode/tasks.json`.
 |---|---|
 |`test_pdu.cpp`|Whole PDUs: the classic `hellohello` reference, validity on/off, address padding, UCS-2, surrogate pairs, GSM special characters, extension escapes|
 |`test_analyze.cpp`|Encoding choice, 160/70 capacity, cutting at character boundaries, invalid UTF-8, number rules, validity rounding, the whole GSM alphabet|
-|`test_modem.cpp`|`sendSMS()` against a simulated modem: the AT dialogue, the PDU on the wire, prompt/network/CMGF failures; `lastError()` and its codes; `waitForReady()`; registration; band-mask parsing|
+|`test_modem.cpp`|`sendSMS()` against a simulated modem: the AT dialogue, the PDU on the wire, prompt/network/CMGF failures; `lastError()` and its codes; `waitForReady()`; IMEI, ICCID, SIM state; registration; band-mask parsing|
 
 The generated PDUs were also decoded with an independent implementation
 (python-gsmmodem's `decodeSmsPdu`) while this suite was written; they decode

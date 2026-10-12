@@ -121,6 +121,18 @@ struct SupportedBands {
 };
 
 /**
+ * @brief SIM card state (AT+CPIN?), see getSimStatus().
+ */
+enum SimStatus {
+    SIM_READY        = 0,   ///< SIM present, no password pending
+    SIM_PIN          = 1,   ///< Waiting for the SIM PIN
+    SIM_PUK          = 2,   ///< Waiting for the SIM PUK (PIN blocked)
+    SIM_LOCKED       = 3,   ///< Another password pending (PH-SIM PIN, PIN2, network lock)
+    SIM_NOT_INSERTED = 4,   ///< No SIM (+CME ERROR: 10)
+    SIM_ERROR        = -1   ///< No answer, or another error
+};
+
+/**
  * @brief What went wrong in the last AT transaction (see lastError()).
  */
 enum class ModemError : uint8_t {
@@ -261,6 +273,13 @@ private:
      * @return true if a quoted field was found and copied successfully.
      */
     bool parseQuotedField(char* buf, uint8_t maxLen);
+
+    /**
+     * @brief Copies the value after "<prefix>: " in _lineBuf into buf, up to
+     *        the end of the line, a space or a quote (quotes skipped).
+     * @return false if there is no value or it does not fit.
+     */
+    bool parseValueAfterColon(char* buf, uint8_t maxLen);
 
 public:
     SimcomA76xx();
@@ -446,6 +465,39 @@ public:
      * @return The Cell ID as a 32-bit integer, or 0 if unavailable.
      */
     uint32_t getCellId();
+
+    /// Buffer size for getIMEI(): 15 digits and the terminator.
+    static const uint8_t IMEI_SIZE  = 16;
+    /// Buffer size for getICCID(): up to 22 characters and the terminator.
+    static const uint8_t ICCID_SIZE = 23;
+
+    /**
+     * @brief Reads the modem's IMEI (AT+SIMEI?).
+     * @param buf    At least IMEI_SIZE bytes.
+     * @param maxLen Size of buf.
+     * @return true if read; false on error or if it does not fit.
+     */
+    bool getIMEI(char* buf, uint8_t maxLen);
+
+    /**
+     * @brief Reads the SIM card's ICCID (AT+CICCID), the number printed on
+     *        the card (19–20 digits, sometimes with a trailing letter).
+     * @param buf    At least ICCID_SIZE bytes.
+     * @param maxLen Size of buf.
+     * @return true if read; false without a SIM, on error or if it does not fit.
+     */
+    bool getICCID(char* buf, uint8_t maxLen);
+
+    /**
+     * @brief The SIM card's state (AT+CPIN?).
+     *
+     * SIM_NOT_INSERTED relies on the numeric error code, which waitForReady()
+     * switches on (AT+CMEE=1). A removed card is noticed only if the
+     * modem's SIM hot-swap detection is on (AT+UIMHOTSWAPON, depends on the
+     * board's card-detect wiring); otherwise only after a restart or
+     * forceReattach().
+     */
+    SimStatus getSimStatus();
 
     /**
      * @brief Sends an SMS in PDU mode (AT+CMGF=0), encoding chosen automatically.

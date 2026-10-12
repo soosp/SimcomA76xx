@@ -25,6 +25,26 @@ void setup() {
       Serial.println(F("Modem timeout. Check wiring/power."));
       while(1);
     }
+
+    // Modem and SIM identity
+    char imei[SimcomA76xx::IMEI_SIZE];
+    if (modem.getIMEI(imei, sizeof(imei))) {
+        Serial.print(F("IMEI: ")); Serial.println(imei);
+    }
+
+    switch (modem.getSimStatus()) {
+        case SIM_READY:        Serial.println(F("SIM: ready")); break;
+        case SIM_PIN:          Serial.println(F("SIM: PIN required")); break;
+        case SIM_PUK:          Serial.println(F("SIM: PUK required (PIN blocked)")); break;
+        case SIM_LOCKED:       Serial.println(F("SIM: locked")); break;
+        case SIM_NOT_INSERTED: Serial.println(F("SIM: not inserted")); break;
+        default:               Serial.println(F("SIM: unknown")); break;
+    }
+
+    char iccid[SimcomA76xx::ICCID_SIZE];
+    if (modem.getICCID(iccid, sizeof(iccid))) {
+        Serial.print(F("ICCID: ")); Serial.println(iccid);
+    }
 }
 
 void loop() {

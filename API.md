@@ -154,6 +154,40 @@ Retrieves the unique identifier of the current serving cell (Global Cell ID).
 
 - **Returns**: The ID as `uint32_t` (e.g., `11187458`), or `0` if not available.
 
+#### `bool getIMEI(char* buf, uint8_t maxLen)`
+
+The modem's IMEI (`AT+SIMEI?`), e.g. `"861234050012345"`. `buf` needs
+`SimcomA76xx::IMEI_SIZE` (16) bytes.
+
+- **Returns**: `true` if read; `false` on error or if the value does not fit.
+
+#### `bool getICCID(char* buf, uint8_t maxLen)`
+
+The SIM card's ICCID (`AT+CICCID`): the number printed on the card, 19–20
+digits, sometimes with a trailing letter. `buf` needs
+`SimcomA76xx::ICCID_SIZE` (23) bytes.
+
+- **Returns**: `true` if read; `false` without a SIM, on error, or if the
+  value does not fit.
+
+#### `SimStatus getSimStatus()`
+
+The SIM card's state (`AT+CPIN?`).
+
+|Value|Meaning|
+|---|---|
+|`SIM_READY` (0)|SIM present, no password pending|
+|`SIM_PIN` (1)|Waiting for the SIM PIN|
+|`SIM_PUK` (2)|Waiting for the PUK (PIN blocked)|
+|`SIM_LOCKED` (3)|Another password pending (PH-SIM PIN, PIN2, network lock)|
+|`SIM_NOT_INSERTED` (4)|No SIM (`+CME ERROR: 10`)|
+|`SIM_ERROR` (-1)|No answer, or another error|
+
+`SIM_NOT_INSERTED` relies on the numeric error code that `waitForReady()`
+switches on. A card removed while running is seen only if the modem's
+hot-swap detection is on (`AT+UIMHOTSWAPON`, depends on the board's
+card-detect wiring); otherwise only after a restart or `forceReattach()`.
+
 #### `bool getSupportedBands(SupportedBands* bands)`
 
 Parses the current band configuration into a `SupportedBands` struct.

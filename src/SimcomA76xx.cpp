@@ -452,6 +452,60 @@ bool SimcomA76xx::getOperatorCode(char* buf, uint8_t maxLen) {
     return result;
 }
 
+bool SimcomA76xx::parseValueAfterColon(char* buf, uint8_t maxLen) {
+    if (!buf || maxLen == 0) return false;
+    const char* p = strchr(_lineBuf, ':');
+    if (!p) return false;
+    p++;
+    while (*p == ' ') p++;
+    if (*p == '"') p++;
+    uint8_t n = 0;
+    while (p[n] && p[n] != '"' && p[n] != ' ' && p[n] != '\r') {
+        if (n >= maxLen - 1) { buf[0] = '\0'; return false; }   // does not fit
+        buf[n] = p[n];
+        n++;
+    }
+    buf[n] = '\0';
+    return n > 0;
+}
+
+bool SimcomA76xx::getIMEI(char* buf, uint8_t maxLen) {
+    if (!_serial || !buf) return false;
+    if (!_lock(_mutexTimeout)) return false;
+    bool result = sendAT("AT+SIMEI?", "+SIMEI:", 2000, true) &&
+                  parseValueAfterColon(buf, maxLen);
+    _unlock();
+    return result;
+}
+
+bool SimcomA76xx::getICCID(char* buf, uint8_t maxLen) {
+    if (!_serial || !buf) return false;
+    if (!_lock(_mutexTimeout)) return false;
+    bool result = sendAT("AT+CICCID", "+ICCID:", 2000, true) &&
+                  parseValueAfterColon(buf, maxLen);
+    _unlock();
+    return result;
+}
+
+SimStatus SimcomA76xx::getSimStatus() {
+    if (!_serial) return SIM_ERROR;
+    if (!_lock(_mutexTimeout)) return SIM_ERROR;
+    SimStatus result = SIM_ERROR;
+    if (sendAT("AT+CPIN?", "+CPIN:", 2000, true)) {
+        const char* p = strchr(_lineBuf, ':');
+        p = p ? p + 1 : "";
+        while (*p == ' ') p++;
+        if (strncmp(p, "READY", 5) == 0)        result = SIM_READY;
+        else if (strcmp(p, "SIM PIN") == 0)     result = SIM_PIN;
+        else if (strcmp(p, "SIM PUK") == 0)     result = SIM_PUK;
+        else                                    result = SIM_LOCKED;
+    } else if (_lastError.error == ModemError::CME_ERROR && _lastError.code == 10) {
+        result = SIM_NOT_INSERTED;               // 3GPP TS 27.007: SIM not inserted
+    }
+    _unlock();
+    return result;
+}
+
 uint32_t SimcomA76xx::getCellId() {
     if (!_lock(_mutexTimeout)) return 0;
 
