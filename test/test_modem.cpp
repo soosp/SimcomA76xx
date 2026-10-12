@@ -510,6 +510,29 @@ int main() {
         CHECK(idle.getSimStatus() == SIM_ERROR);
     }
 
+    SECTION("name functions");
+    {
+        char b[SimcomA76xx::NAME_SIZE];
+        CHECK(strcmp(SimcomA76xx::registrationName(REG_SEARCHING, b, sizeof(b)), "searching") == 0);
+        CHECK(strcmp(SimcomA76xx::registrationName(REG_NOT_REGISTERED, b, sizeof(b)), "not_registered") == 0);
+        CHECK(strcmp(SimcomA76xx::registrationName(REG_ERROR, b, sizeof(b)), "error") == 0);
+        CHECK(strcmp(SimcomA76xx::registrationName((RegistrationStatus)9, b, sizeof(b)), "?") == 0);
+        CHECK(strcmp(SimcomA76xx::simStatusName(SIM_NOT_INSERTED, b, sizeof(b)), "not_inserted") == 0);
+        CHECK(strcmp(SimcomA76xx::simStatusName(SIM_ERROR, b, sizeof(b)), "error") == 0);
+        CHECK(strcmp(SimcomA76xx::errorName(ModemError::CMS_ERROR, b, sizeof(b)), "cms_error") == 0);
+        CHECK(strcmp(SimcomA76xx::errorName(ModemError::NOT_STARTED, b, sizeof(b)), "not_started") == 0);
+        // The longest name fits NAME_SIZE exactly
+        CHECK(strlen(SimcomA76xx::registrationName(REG_SMS_ONLY_ROAMING, b, sizeof(b)))
+              == SimcomA76xx::NAME_LEN);
+        CHECK(strlen(SimcomA76xx::errorName(ModemError::INVALID_ARGUMENT, b, sizeof(b)))
+              <= SimcomA76xx::NAME_LEN);
+        // Cut, terminated; no buffer
+        char small[5];
+        CHECK(strcmp(SimcomA76xx::registrationName(REG_SEARCHING, small, sizeof(small)), "sear") == 0);
+        CHECK(SimcomA76xx::simStatusName(SIM_READY, nullptr, 8) == nullptr);
+        CHECK(SimcomA76xx::errorName(ModemError::NONE, b, 0) == nullptr);
+    }
+
     SECTION("analyzeSMS() needs no modem");
     {
         SmsInfo i = SimcomA76xx::analyzeSMS("Fagyaszt\xC3\xB3");

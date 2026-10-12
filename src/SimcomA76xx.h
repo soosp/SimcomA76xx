@@ -88,7 +88,7 @@ namespace Bands {
  * @brief Network registration states based on 3GPP TS 27.007 (AT+CEREG).
  */
 enum RegistrationStatus {
-    REG_NOT_REGISTERED   = 0,  ///< Not registered, not searching
+    REG_NOT_REGISTERED   = 0,  ///< Not registered, and not searching (see API.md)
     REG_HOME             = 1,  ///< Registered on home network
     REG_SEARCHING        = 2,  ///< Not registered, but currently searching
     REG_DENIED           = 3,  ///< Registration denied
@@ -487,6 +487,38 @@ public:
      * @return true if read; false without a SIM, on error or if it does not fit.
      */
     bool getICCID(char* buf, uint8_t maxLen);
+
+    /// Longest name from registrationName(), simStatusName() and
+    /// errorName(), excluding the null terminator ("sms_only_roaming").
+    static const uint8_t NAME_LEN  = 16;
+    /// Buffer size for the name functions, including the null terminator.
+    static const uint8_t NAME_SIZE = NAME_LEN + 1;
+
+    /**
+     * @brief Name of a registration state, for logs and status pages:
+     *        "not_registered", "home", "searching", "denied", "unknown",
+     *        "roaming", "sms_only_home", "sms_only_roaming",
+     *        "emergency_only", "error"; "?" for any other value.
+     * @param buf Destination, NAME_SIZE bytes for every name to fit.
+     * @param len Size of @p buf; a longer name is cut.
+     * @return @p buf, or nullptr if @p buf is null or @p len is 0.
+     */
+    static char* registrationName(RegistrationStatus status, char* buf, size_t len);
+
+    /**
+     * @brief Name of a SIM state: "ready", "pin", "puk", "locked",
+     *        "not_inserted", "error"; "?" for any other value.
+     * @copydetails registrationName
+     */
+    static char* simStatusName(SimStatus status, char* buf, size_t len);
+
+    /**
+     * @brief Name of a ModemError: "none", "at_error", "cme_error",
+     *        "cms_error", "timeout", "no_prompt", "busy",
+     *        "invalid_argument", "not_started"; "?" for any other value.
+     * @copydetails registrationName
+     */
+    static char* errorName(ModemError error, char* buf, size_t len);
 
     /**
      * @brief The SIM card's state (AT+CPIN?).

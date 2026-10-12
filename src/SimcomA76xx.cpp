@@ -5,6 +5,80 @@
 
 #include "SimcomA76xx.h"
 
+// Name strings live in flash on AVR (PSTR); elsewhere they are ordinary
+// constant strings.
+#if defined(__AVR__)
+    #include <avr/pgmspace.h>
+    #define SA_NAME(s) PSTR(s)
+#else
+    #define SA_NAME(s) (s)
+#endif
+
+/// Bounded copy of a name (from flash on AVR); always terminated.
+static char* copyName(const char* src, char* buf, size_t len) {
+    if (buf == nullptr || len == 0) return nullptr;
+#if defined(__AVR__)
+    size_t n = strlen_P(src);
+    if (n > len - 1) n = len - 1;
+    memcpy_P(buf, src, n);
+#else
+    size_t n = strlen(src);
+    if (n > len - 1) n = len - 1;
+    memcpy(buf, src, n);
+#endif
+    buf[n] = '\0';
+    return buf;
+}
+
+char* SimcomA76xx::registrationName(RegistrationStatus status, char* buf, size_t len) {
+    const char* s;
+    switch (status) {
+        case REG_NOT_REGISTERED:   s = SA_NAME("not_registered");   break;
+        case REG_HOME:             s = SA_NAME("home");             break;
+        case REG_SEARCHING:        s = SA_NAME("searching");        break;
+        case REG_DENIED:           s = SA_NAME("denied");           break;
+        case REG_UNKNOWN:          s = SA_NAME("unknown");          break;
+        case REG_ROAMING:          s = SA_NAME("roaming");          break;
+        case REG_SMS_ONLY_HOME:    s = SA_NAME("sms_only_home");    break;
+        case REG_SMS_ONLY_ROAMING: s = SA_NAME("sms_only_roaming"); break;
+        case REG_EMERGENCY_ONLY:   s = SA_NAME("emergency_only");   break;
+        case REG_ERROR:            s = SA_NAME("error");            break;
+        default:                   s = SA_NAME("?");                break;
+    }
+    return copyName(s, buf, len);
+}
+
+char* SimcomA76xx::simStatusName(SimStatus status, char* buf, size_t len) {
+    const char* s;
+    switch (status) {
+        case SIM_READY:        s = SA_NAME("ready");        break;
+        case SIM_PIN:          s = SA_NAME("pin");          break;
+        case SIM_PUK:          s = SA_NAME("puk");          break;
+        case SIM_LOCKED:       s = SA_NAME("locked");       break;
+        case SIM_NOT_INSERTED: s = SA_NAME("not_inserted"); break;
+        case SIM_ERROR:        s = SA_NAME("error");        break;
+        default:               s = SA_NAME("?");            break;
+    }
+    return copyName(s, buf, len);
+}
+
+char* SimcomA76xx::errorName(ModemError error, char* buf, size_t len) {
+    const char* s;
+    switch (error) {
+        case ModemError::NONE:             s = SA_NAME("none");             break;
+        case ModemError::AT_ERROR:         s = SA_NAME("at_error");         break;
+        case ModemError::CME_ERROR:        s = SA_NAME("cme_error");        break;
+        case ModemError::CMS_ERROR:        s = SA_NAME("cms_error");        break;
+        case ModemError::TIMEOUT:          s = SA_NAME("timeout");          break;
+        case ModemError::NO_PROMPT:        s = SA_NAME("no_prompt");        break;
+        case ModemError::BUSY:             s = SA_NAME("busy");             break;
+        case ModemError::INVALID_ARGUMENT: s = SA_NAME("invalid_argument"); break;
+        case ModemError::NOT_STARTED:      s = SA_NAME("not_started");      break;
+        default:                           s = SA_NAME("?");                break;
+    }
+    return copyName(s, buf, len);
+}
+
 SimcomA76xx::SimcomA76xx() : _serial(NULL), _pwrPin(-1), _mutexTimeout(10000) {
     memset(_lineBuf, 0, sizeof(_lineBuf));
     setError(ModemError::NONE);

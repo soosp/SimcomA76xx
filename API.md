@@ -89,18 +89,29 @@ Returns the Received Signal Strength Indicator (RSSI).
 
 Queries the network registration state (`AT+CEREG?`).
 
-**Returns:**
+**Returns** the `<stat>` field of the answer (3GPP TS 27.007), with the
+name `registrationName()` gives it:
 
-- `REG_HOME` (1): Registered on home network.
-- `REG_SEARCHING` (2): Not registered, but currently searching for an operator.
-- `REG_ROAMING` (5): Registered on a roaming partner network.
-- `REG_SMS_ONLY_HOME` (6) / `REG_SMS_ONLY_ROAMING` (7): Registered for SMS
-  only, home / roaming network.
-- `REG_NOT_REGISTERED` (0): Not registered and not searching.
-- `REG_DENIED` (3): Registration was rejected by the network.
-- `REG_UNKNOWN` (4): Unknown state (out of coverage).
-- `REG_EMERGENCY_ONLY` (11): Attached for emergency bearer services only.
-- `REG_ERROR` (-1): Communication error with the modem.
+|Value|Name|Meaning|
+|---|---|---|
+|`REG_NOT_REGISTERED` (0)|`not_registered`|Not registered, and not searching for an operator either (see below)|
+|`REG_HOME` (1)|`home`|Registered on the home network|
+|`REG_SEARCHING` (2)|`searching`|Not registered, searching for an operator to register to|
+|`REG_DENIED` (3)|`denied`|Registration refused by the network|
+|`REG_UNKNOWN` (4)|`unknown`|State unknown, e.g. out of coverage|
+|`REG_ROAMING` (5)|`roaming`|Registered on a roaming partner network|
+|`REG_SMS_ONLY_HOME` (6)|`sms_only_home`|Registered for SMS only, home network|
+|`REG_SMS_ONLY_ROAMING` (7)|`sms_only_roaming`|Registered for SMS only, roaming|
+|`REG_EMERGENCY_ONLY` (11)|`emergency_only`|Attached for emergency bearer services only|
+|`REG_ERROR` (-1)|`error`|No valid answer from the modem (library value)|
+
+`REG_NOT_REGISTERED` is the one "not registered" state in which the modem
+is not trying: `searching`, `denied` and `unknown` are not registered
+either, but there the modem is searching, has been refused, or cannot
+tell. Typical causes are no SIM or a SIM that is not ready, the radio
+switched off (`AT+CFUN=0`), and deregistration with `AT+COPS=2`. Whether
+and when the modem starts searching again on its own is up to the modem;
+`forceReattach()` restarts the search.
 
 ##### Application example
 
@@ -187,6 +198,33 @@ The SIM card's state (`AT+CPIN?`).
 switches on. A card removed while running is seen only if the modem's
 hot-swap detection is on (`AT+UIMHOTSWAPON`, depends on the board's
 card-detect wiring); otherwise only after a restart or `forceReattach()`.
+
+#### Names: `registrationName()`, `simStatusName()`, `errorName()`
+
+```cpp
+static char* registrationName(RegistrationStatus status, char* buf, size_t len);
+static char* simStatusName(SimStatus status, char* buf, size_t len);
+static char* errorName(ModemError error, char* buf, size_t len);
+```
+
+Copy the name of a value into `buf`, for logs, status pages and MQTT. The
+names are lower case with underscores; any other value gives `"?"`. A
+buffer of `NAME_SIZE` (17) bytes holds every name; a shorter one gets the
+name cut, always terminated. They return `buf`, or `nullptr` if `buf` is
+null or `len` is 0. On AVR the strings stay in flash.
+
+|Function|Names|
+|---|---|
+|`registrationName()`|`not_registered`, `home`, `searching`, `denied`, `unknown`, `roaming`, `sms_only_home`, `sms_only_roaming`, `emergency_only`, `error`|
+|`simStatusName()`|`ready`, `pin`, `puk`, `locked`, `not_inserted`, `error`|
+|`errorName()`|`none`, `at_error`, `cme_error`, `cms_error`, `timeout`, `no_prompt`, `busy`, `invalid_argument`, `not_started`|
+
+```cpp
+char name[SimcomA76xx::NAME_SIZE];
+Serial.print("registration: ");
+Serial.println(SimcomA76xx::registrationName(modem.getRegistrationStatus(),
+                                             name, sizeof(name)));
+```
 
 #### `bool getSupportedBands(SupportedBands* bands)`
 

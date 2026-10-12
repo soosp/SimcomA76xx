@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `registrationName()`, `simStatusName()` and `errorName()`: the names of
+  `RegistrationStatus`, `SimStatus` and `ModemError` values for logs and
+  status pages, copied into a caller's buffer (`NAME_SIZE`); in flash on
+  AVR
+
 ## [0.6.0] - 2026-10-12
 
 ### Added
