@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-12
+
 ### Added
 
 - `registrationName()`, `simStatusName()` and `errorName()`: the names of
@@ -141,7 +143,8 @@ All notable changes to this project will be documented in this file.
 
 - First public release
 
-[unreleased]: https://github.com/soosp/SimcomA76xx/compare/0.6.0...HEAD
+[unreleased]: https://github.com/soosp/SimcomA76xx/compare/0.7.0...HEAD
+[0.7.0]: https://github.com/soosp/SimcomA76xx/compare/0.6.0...0.7.0
 [0.6.0]: https://github.com/soosp/SimcomA76xx/compare/0.5.1...0.6.0
 [0.5.1]: https://github.com/soosp/SimcomA76xx/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/soosp/SimcomA76xx/compare/0.4.1...0.5.0
