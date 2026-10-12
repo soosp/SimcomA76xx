@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-12
+
 ### Fixed
 
 - Queries (`sendAT()` in multiline mode, and the getters built on it) now
@@ -123,7 +125,8 @@ All notable changes to this project will be documented in this file.
 
 - First public release
 
-[unreleased]: https://github.com/soosp/SimcomA76xx/compare/0.5.0...HEAD
+[unreleased]: https://github.com/soosp/SimcomA76xx/compare/0.5.1...HEAD
+[0.5.1]: https://github.com/soosp/SimcomA76xx/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/soosp/SimcomA76xx/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/soosp/SimcomA76xx/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/soosp/SimcomA76xx/compare/0.3.0...0.4.0
