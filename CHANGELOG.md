@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Queries (`sendAT()` in multiline mode, and the getters built on it) now
+  read their response up to the final `OK`. The `OK` was left unread, and if
+  it arrived after the next command had flushed the input, that command took
+  it for its own answer
+
 ## [0.5.0] - 2026-10-11
 
 ### Added

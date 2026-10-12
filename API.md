@@ -32,7 +32,9 @@ Sends a raw AT command and waits for a specific response.
   In multiline mode: a substring prefix to search for (e.g. `"+CSQ:"`).
 - **timeout**: Maximum time to wait for the response in milliseconds.
 - **multiline**: If `true`, searches for `expectedResponse` as a substring and
-  leaves the matched line in the internal buffer for the caller to parse.
+  leaves the matched line in the internal buffer for the caller to parse. The
+  rest of the response, up to the final `OK` (or error), is read and
+  discarded, so the next command does not see it.
 - **Returns**: `true` if the expected response was found, `false` on `ERROR`
   or timeout.
 

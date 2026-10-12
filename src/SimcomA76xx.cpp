@@ -133,6 +133,32 @@ bool SimcomA76xx::waitForResponse(const char* expected, uint32_t timeout) {
     return result;
 }
 
+bool SimcomA76xx::drainToFinal(uint32_t timeout) {
+    // Own small buffer: _lineBuf keeps the matched line for the caller
+    char line[12];
+    uint8_t idx = 0;
+    uint32_t start = millis();
+    while (millis() - start < timeout) {
+        while (_serial->available()) {
+            char c = _serial->read();
+            if (c == '\r') continue;
+            if (c != '\n') {
+                if (idx < sizeof(line) - 1) line[idx++] = c;
+                continue;
+            }
+            line[idx] = '\0';
+            idx = 0;
+            if (strcmp(line, "OK") == 0 || strcmp(line, "ERROR") == 0 ||
+                strncmp(line, "+CME ERROR", 10) == 0 ||
+                strncmp(line, "+CMS ERROR", 10) == 0) {
+                return true;
+            }
+        }
+        _wait(1);
+    }
+    return false;
+}
+
 bool SimcomA76xx::sendAT(const char* command, const char* expectedResponse,
                           uint32_t timeout, bool multiline) {
     if (!_serial) { setError(ModemError::NOT_STARTED); return false; }
@@ -149,7 +175,13 @@ bool SimcomA76xx::sendAT(const char* command, const char* expectedResponse,
         if (readLine(timeout - (millis() - start))) {
             if (takeErrorLine())                         { failed = true; break; }
             if (strcmp(_lineBuf, expectedResponse) == 0) { result = true; break; }
-            if (multiline && strstr(_lineBuf, expectedResponse)) { result = true; break; }
+            if (multiline && strstr(_lineBuf, expectedResponse)) {
+                // The final OK follows the data line: consume it now, or the
+                // next command may take it for its own answer
+                drainToFinal(timeout - (millis() - start));
+                result = true;
+                break;
+            }
         }
     }
     if (result)       setError(ModemError::NONE);

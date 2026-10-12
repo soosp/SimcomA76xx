@@ -26,11 +26,23 @@ public:
     int  cereg         = 1;             ///< <stat> reported by AT+CEREG?
     int  creg          = 1;             ///< <stat> reported by AT+CREG?
     int  registerAfter = 0;             ///< CEREG turns 1 after this many queries
+    bool lateOk        = false;         ///< Query answers: the final OK comes a moment later
     int  regQueries    = 0;
     int  writeCalls    = 0;             ///< write() calls (a queued port: one item each)
     int  pduWriteCalls = 0;             ///< ... of them while the PDU was being sent
 
-    int available() override { return (int)_rx.size(); }
+    int available() override {
+        // lateOk: the held-back OK appears only after one empty poll, as on
+        // a real UART where it is still on the wire
+        if (_rx.empty() && !_late.empty()) {
+            if (_latePolls++ >= 1) {
+                for (char c : _late) _rx.push_back(c);
+                _late.clear();
+                _latePolls = 0;
+            }
+        }
+        return (int)_rx.size();
+    }
     int read() override {
         if (_rx.empty()) return -1;
         int c = (uint8_t)_rx.front(); _rx.pop_front(); return c;
@@ -74,7 +86,12 @@ private:
                 regQueries++;
                 if (registerAfter > 0 && regQueries >= registerAfter) cereg = 1;
                 char b[48];
-                snprintf(b, sizeof(b), "\r\n+CEREG: 0,%d\r\n\r\nOK\r\n", cereg);
+                if (lateOk) {
+                    snprintf(b, sizeof(b), "\r\n+CEREG: 0,%d\r\n", cereg);
+                    _late += "\r\nOK\r\n";
+                } else {
+                    snprintf(b, sizeof(b), "\r\n+CEREG: 0,%d\r\n\r\nOK\r\n", cereg);
+                }
                 reply(b);
             }
             else if (_line == "AT+CREG?") {
@@ -98,6 +115,8 @@ private:
 
     void reply(const char* s) { while (*s) _rx.push_back(*s++); }
     std::deque<char> _rx;
+    std::string      _late;
+    int              _latePolls = 0;
     std::string      _line;
     bool             _inPdu = false;
 };
@@ -423,6 +442,18 @@ int main() {
         for (int16_t c : permanent) CHECK(SimcomA76xx::isPermanentSmsError(c));
         const int16_t transient[] = {-1, 0, 27, 38, 41, 42, 47, 331, 332, 500};
         for (int16_t c : transient) CHECK(!SimcomA76xx::isPermanentSmsError(c));
+    }
+
+    SECTION("multiline query consumes its final OK, also when it arrives late");
+    {
+        FakeModem fm;
+        fm.lateOk = true;
+        SimcomA76xx modem;
+        modem.begin(fm);
+        CHECK(modem.getRegistrationStatus() == REG_HOME);
+        // The next command gets no answer: it must not take the query's OK
+        CHECK(!modem.sendAT("AT+UNKNOWN", "OK", 100));
+        CHECK(modem.lastError().error == ModemError::TIMEOUT);
     }
 
     SECTION("analyzeSMS() needs no modem");

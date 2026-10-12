@@ -156,6 +156,13 @@ private:
      */
     bool takeErrorLine();
 
+    /**
+     * @brief Reads and discards lines up to the final result (OK, ERROR,
+     *        +CME/+CMS ERROR), leaving _lineBuf untouched.
+     * @return true if a final result line was seen before the timeout.
+     */
+    bool drainToFinal(uint32_t timeout);
+
     void setError(ModemError e, int16_t code = -1) {
         _lastError.error = e;
         _lastError.code  = code;
@@ -289,7 +296,9 @@ public:
      *                         In multiline mode: a substring prefix to search for (e.g. "+CSQ:").
      * @param timeout Maximum time to wait for the response in milliseconds.
      * @param multiline If true, searches for expectedResponse as a substring and
-     *                  leaves the matched line in _lineBuf for the caller to parse.
+     *                  leaves the matched line in _lineBuf for the caller to parse;
+     *                  the rest of the response, up to the final OK or error, is
+     *                  read and discarded.
      * @return true if the expected response was found, false on ERROR or timeout.
      */
     bool sendAT(const char* command, const char* expectedResponse = "OK",
